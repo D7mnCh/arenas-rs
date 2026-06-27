@@ -16,21 +16,26 @@ it is the simpliest allocator, it just allocates or deallactes memory, no fancy 
 - "pointer" to where this bumb allocator "start", in order to deallocate(bumbing) it later
 - a "tracker pointer" that tracks the offset in terms of pointers so i can get the requested data by that pointer
 - an "offset bytes size counter" that keep track of "how many bytes" that are allocated to check if you can allocate more size, by comparing it with "arena size" and by adding with the "requested-bytes"
-### where to use
+### when/where to use
 
 
 # What i learned
 
 - each block in memroy represent an address, we deal with addresses as bytes, and hexdecimal number
 - rust std returend `u8` as a pointee type, cuz it's easier to deal with pointers arithmetics (only in pure bytes: u8 == 1 byte!)
+
 - a `layout` is a description/request of a chunk of memory(no allocation yet), that request a size and an alignment
     - the required alignment is just an information, you'll impl the offset of the pointer manually to make an aligned data, the length is need for allocation
+
 - `memory alignment` describes where piece of data should store in memory, a data is properly aligned if its "starting address" is a "multiple" of its "required alignemnt", when this condition satisfied, we say "the data is "aligned" or "properley aligned""
     - required alignment = is a num that describe where to allocate a data in memory in order to be valid, that valid address most be divisble by that number(required alignment)
     - example usage: "data have alignment of 8 bytes(a valid address for this data are divible by 8)"
 - each type have different alignment (i thought why just make them all have alignment 1, so you can place any data in any address. But that will dencrease CPU efficiency as i know(need search))
-- struct alignment is largetst field alignment ((why?, need search))
+- struct alignment is the largetst field alignment ((why?, need search))
 - The size of a value is always a multiple of its alignment
 
-- `padding` is an ignored address(empty) within the arena (that was being allocated), it contains a garbage value or if initialize 0 value
+- `padding` is an ignored address(empty) within the arena, it contains a garbage value or if initialized 0 or \0 value
     - less padding = more performance(need search)
+    - in order to align a data, you need to offset the pointer forward, you'll have padding between the prev and current pos of the pointer
+    - 1 padding = 1 byte
+    - padding between allocation do count/add as/to arena's used bytes, but they didn't count as used space( no data owns it)
