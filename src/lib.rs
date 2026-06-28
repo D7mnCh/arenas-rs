@@ -14,12 +14,13 @@ struct BumbAlloc {
 }
 
 impl BumbAlloc {
-    // we need "const generic" cuz an array will be build with a provided
-    //length array type must be know at compile time
     fn build(length: usize) -> Self {
         let layout = Layout::from_size_align(length, ALIGNMENT).unwrap();
-        let arena_allocation_request = layout.size();
-        dbg!(&arena_allocation_request);
+
+        let arena_size = layout.size();
+        dbg!(&arena_size);
+        println!();
+
         let ptr = unsafe { alloc_zeroed(layout) };
 
         Self {
@@ -33,23 +34,24 @@ impl BumbAlloc {
     fn push(&mut self, layout: &Layout) -> *mut u8 {
         let prev_tracker: *mut u8;
         let requested_bytes = layout.size();
+        dbg!(&requested_bytes);
 
         if self.layout.size() >= self.used_bytes + layout.align() {
-            dbg!(&requested_bytes);
-            // return this pointer to current tracker
             prev_tracker = self.tracker;
+
+            let padding = self.tracker.align_offset(layout.align());
+
             // updating arena tracker pointer
-            let offset = BumbAlloc::align_forward(self.used_bytes, &layout) + requested_bytes;
+            let offset = padding + requested_bytes;
+            dbg!(&prev_tracker);
             unsafe {
-                dbg!(&prev_tracker);
                 self.tracker = self.tracker.add(offset);
-                dbg!(&offset);
-                dbg!(&self.tracker);
             }
+            dbg!(&offset);
+            dbg!(&self.tracker);
 
             // updating arena used bytes
-            let padding = BumbAlloc::align_forward(self.used_bytes, &layout);
-            let new_bytes = requested_bytes + padding;
+            let new_bytes = padding + requested_bytes;
             self.used_bytes += new_bytes;
             dbg!(&self.used_bytes);
         } else {
@@ -62,21 +64,6 @@ impl BumbAlloc {
         println!();
 
         prev_tracker
-    }
-
-    // rust do have a method to align requested memory address "align_offset"
-    // NOTE i suggest you to use that method, but mention the calculation
-    //on README.md
-    fn align_forward(current_used_bytes: usize, layout: &Layout) -> usize {
-        let modulo = current_used_bytes % layout.align();
-        let mut padding = 0;
-
-        if modulo != 0 {
-            padding = layout.align() - modulo;
-            dbg!(&padding);
-        }
-
-        padding
     }
 
     fn uninitialize(&mut self) {
@@ -130,7 +117,7 @@ mod test {
         arena.clear();
 
         assert_eq!(arena.layout.size(), 0);
-        // can't have alignment of 0 in rust
+        // can't have alignment of 0 bytes in rust
         assert_eq!(arena.layout.align(), 1);
         assert_eq!(arena.used_bytes, 0);
         assert_eq!(arena.tracker, ptr::null_mut());

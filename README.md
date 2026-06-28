@@ -7,21 +7,30 @@ Building arenas (region-based) memorey allocators in rust, implementing bumb, st
 # Concepts
 ## general purpose allocator
 it is the simpliest allocator, it just allocates or deallactes memory, no fancy methods or algorithms, in c or rust, it is the default allocator
-## Bumb/leaner allocator (need re-write)
+## Bumb/leaner allocator
 - it basically can allocate memory leanery only in one direction, that's means you can't like deallocate prev allocation.
 > [!NOTE]
 > if you want an allocator that deallocate memory on the last allocation on the arena, consider reading about the next allocator (the stack allocator)
+
 - if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bumb" came from!)
-### implimentation,what you gonna need ?
-- "pointer" to where this bumb allocator "start", in order to deallocate(bumbing) it later
-- a "tracker pointer" that tracks the offset in terms of pointers so i can get the requested data by that pointer
-- an "offset bytes size counter" that keep track of "how many bytes" that are allocated to check if you can allocate more size, by comparing it with "arena size" and by adding with the "requested-bytes"
-### when/where to use
+### implimentation 
+- we gonna impl
+    - `build` function: to build the arena with specific layout
+    - `push`  function: to push data to the arena, returning a pointer to the start of it
+    - `clear` function: to deallocate the arena
+#### what you gonna need ?
+- a "layout" know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed for dealloc () function
+- a "pointer" points to the beginning of the arena, in order to deallocate(bumbing) it later with dealloc() function
+- a "tracker pointer" that tracks where the "end of last data allocation pos", and tracks requested data start pos
+- "used bytes counter" that tracks "how many bytes" that are allocated to check if you can allocate more size, by comparing it with "arena size" and "requested-bytes"
+#### challenges
+- the only challenge you'll face is aligning data (give data valid memory address that is based on the data alignment), you gonna offset the pointer by adding padding (if needed) that are result of aligning data, and by adding also data size to the offset value for the pointer, lukcy for us rust does have a method for aligning data "align_offset" method. for increamenting used bytes value, it equals to the offset value, cuz we are not restrict to arena alignemnt, which equals to 1
+> [!NOTE]
+> if you want to align the data, without rust method, you only need the modular of current used bytes by data alignment, that used to substract data alignment with it
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 
-
-# What i learned
+# What i learned (Author's notes)
 
 - each block in memroy represent an address, we deal with addresses as bytes, and hexdecimal number
 - rust std returend `u8`(a byte in size) as a pointee type, make pointer manipulation easy to resaon about cuz your are doing them with pure bytes
@@ -43,6 +52,6 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
     - 1 padding = 1 byte
     - padding between allocation do count/add as/to arena's used bytes, but they didn't count as used space( no data owns it)
 
-- `memory curretion`
-- `memory leak`
-- `fragmentation`
+- `memory currpetion` means a pointer writes to or reads from memory it shouldn't (can be inside or outside the allocation), can lead to undefined behavior
+- `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
+- `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignemnt
