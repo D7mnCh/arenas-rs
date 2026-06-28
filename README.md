@@ -1,5 +1,5 @@
 # arenas-rs
-Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, free-list and pool allocator
+Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, free-list and pool allocators
 
 > [!NOTE]
 > most of the time when i say "allocate" i meant to allocate some block "inside" the region/arena
@@ -51,6 +51,7 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
     - in order to align a data, you need to offset the pointer forward, you'll have padding between the prev and current pos of the pointer
     - 1 padding = 1 byte
     - padding between allocation do count/add as/to arena's used bytes, but they didn't count as used space( no data owns it)
+    - padding can be also when the size of struct/enum is not multiple of its alignment, so that value will have padding at the end called `trailled padding`
 
 - `memory currpetion` means a pointer writes to or reads from memory it shouldn't (can be inside or outside the allocation), can lead to undefined behavior
 - `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
