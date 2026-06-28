@@ -4,7 +4,7 @@ use std::{
     ptr,
 };
 
-const DATA_ALIGNMENT: usize = 1;
+const ALIGNMENT: usize = 1;
 
 struct BumbAlloc {
     start: *mut u8,
@@ -16,12 +16,10 @@ struct BumbAlloc {
 impl BumbAlloc {
     // we need "const generic" cuz an array will be build with a provided
     //length array type must be know at compile time
-    fn build_with(length: usize) -> Self {
-        let layout = Layout::from_size_align(length, DATA_ALIGNMENT).unwrap();
-        println!(
-            "[INFO] requested {} bytes of memory to allocate an arena",
-            layout.size()
-        );
+    fn build(length: usize) -> Self {
+        let layout = Layout::from_size_align(length, ALIGNMENT).unwrap();
+        let arena_allocation_request = layout.size();
+        dbg!(&arena_allocation_request);
         let ptr = unsafe { alloc_zeroed(layout) };
 
         Self {
@@ -32,57 +30,54 @@ impl BumbAlloc {
         }
     }
 
-    fn append_with(&mut self, layout: &Layout) -> *mut u8 {
-        let data_ptr: *mut u8;
+    fn push(&mut self, layout: &Layout) -> *mut u8 {
+        let prev_tracker: *mut u8;
+        let requested_bytes = layout.size();
+
         if self.layout.size() >= self.used_bytes + layout.align() {
-            println!("[INFO] requesting {} bytes to allocate", layout.size());
+            dbg!(&requested_bytes);
             // return this pointer to current tracker
-            data_ptr = self.tracker;
+            prev_tracker = self.tracker;
             // updating arena tracker pointer
-            let offset = BumbAlloc::align_forward(self.used_bytes, &layout) + layout.size();
+            let offset = BumbAlloc::align_forward(self.used_bytes, &layout) + requested_bytes;
             unsafe {
-                // offset the pointer(tracker) to get an align address
-                println!("[INFO] tracker points to : {:?}", self.tracker);
+                dbg!(&prev_tracker);
                 self.tracker = self.tracker.add(offset);
-                println!("[INFO] offsetting track pointer by {offset}");
-                println!("[INFO] tracker now points to : {:?}", self.tracker);
+                dbg!(&offset);
+                dbg!(&self.tracker);
             }
 
             // updating arena used bytes
             let padding = BumbAlloc::align_forward(self.used_bytes, &layout);
-            let new_bytes = layout.size() + padding;
-            println!(
-                "[INFO] add {new} bytes to arena's used bytes",
-                new = new_bytes
-            );
-
+            let new_bytes = requested_bytes + padding;
             self.used_bytes += new_bytes;
-            println!("[INFO] total used bytes : {}", self.used_bytes);
+            dbg!(&self.used_bytes);
         } else {
-            eprintln!("[ERROR] requested allocation is more then arena's remaining space",);
-            data_ptr = ptr::null_mut()
+            eprintln!("[ERROR] requested allocation is more then arena's remaining space\n",);
+            prev_tracker = ptr::null_mut()
         };
 
-        let remaining = self.layout.size().saturating_sub(self.used_bytes);
-        println!("[INFO] remaining space: {remaining}\n");
+        let remaining_space = self.layout.size().saturating_sub(self.used_bytes);
+        dbg!(&remaining_space);
+        println!();
 
-        data_ptr
+        prev_tracker
     }
 
+    // rust do have a method to align requested memory address "align_offset"
+    // NOTE i suggest you to use that method, but mention the calculation
+    //on README.md
     fn align_forward(current_used_bytes: usize, layout: &Layout) -> usize {
         let modulo = current_used_bytes % layout.align();
         let mut padding = 0;
 
         if modulo != 0 {
             padding = layout.align() - modulo;
-            println!("[INFO] skip {padding} bytes of padding");
+            dbg!(&padding);
         }
 
         padding
     }
-
-    // TODO think
-    pub fn reallocate_with_new(&mut self, _layout: Layout) {}
 
     fn uninitialize(&mut self) {
         self.used_bytes = 0;
@@ -91,13 +86,18 @@ impl BumbAlloc {
         self.tracker = ptr::null_mut();
     }
 
-    pub fn bumb(&mut self) {
+    pub fn clear(&mut self) {
         unsafe { dealloc(self.start, self.layout) };
         self.uninitialize();
     }
 }
 
-// TODO add more tests
+impl Drop for BumbAlloc {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
 #[cfg(test)]
 mod test {
     const LENGTH: usize = 1000;
@@ -105,30 +105,16 @@ mod test {
     use super::*;
     #[test]
     fn arena_size() {
-        let arena = BumbAlloc::build_with(LENGTH);
+        let arena = BumbAlloc::build(LENGTH);
 
         assert_eq!(arena.layout.size(), LENGTH);
     }
 
     #[test]
-    fn appending_arena() {
-        const LENGTH: usize = 10;
-        let mut arena = BumbAlloc::build_with(LENGTH);
-
-        let i32_layout = Layout::new::<i32>();
-        arena.append_with(&i32_layout);
-        arena.append_with(&i32_layout);
-        let i16_layout = Layout::new::<i16>();
-        arena.append_with(&i16_layout);
-
-        assert_eq!(arena.used_bytes, LENGTH);
-    }
-
-    #[test]
     fn not_enough_space_to_allocate() {
-        let mut arena = BumbAlloc::build_with(0);
+        let mut arena = BumbAlloc::build(0);
         let layout = Layout::new::<i32>();
-        let ptr = arena.append_with(&layout);
+        let ptr = arena.push(&layout);
         // not enough space, arena.used_bytes will not change
         assert_eq!(arena.used_bytes, 0);
         assert!(ptr.is_null());
@@ -136,12 +122,12 @@ mod test {
 
     #[test]
     fn bumbing_arena() {
-        let mut arena = BumbAlloc::build_with(LENGTH);
+        let mut arena = BumbAlloc::build(LENGTH);
 
         let layout = Layout::new::<i32>();
-        let _ = arena.append_with(&layout);
+        let _ = arena.push(&layout);
 
-        arena.bumb();
+        arena.clear();
 
         assert_eq!(arena.layout.size(), 0);
         // can't have alignment of 0 in rust
@@ -152,15 +138,15 @@ mod test {
     }
 
     #[test]
-    fn append_primitives_to_arena() {
-        let mut arena = BumbAlloc::build_with(LENGTH);
+    fn arena_push_primitives() {
+        let mut arena = BumbAlloc::build(LENGTH);
 
         let layout = Layout::new::<[i16; 2]>();
-        let ptr_1 = arena.append_with(&layout).cast::<[i16; 2]>();
+        let ptr_1 = arena.push(&layout).cast::<[i16; 2]>();
         assert_eq!(arena.used_bytes, 4);
 
         let layout = Layout::new::<[i64; 3]>();
-        let ptr_2 = arena.append_with(&layout).cast::<[i64; 3]>();
+        let ptr_2 = arena.push(&layout).cast::<[i64; 3]>();
         let padding = 4;
         let prev_area_used_bytes = 4;
         assert_eq!(
@@ -176,11 +162,11 @@ mod test {
             assert_eq!(ptr_2.read(), [3, 4, 5]);
         }
 
-        arena.bumb();
+        arena.clear();
     }
 
     #[test]
-    fn append_structs_to_arena() {
+    fn arena_push_struct() {
         #[derive(Debug)]
         struct Foo {
             data: bool,
@@ -194,12 +180,12 @@ mod test {
 
         let foo_layout = Layout::new::<Foo>();
         let boo_layout = Layout::new::<Boo>();
-        let mut arena = BumbAlloc::build_with(LENGTH);
+        let mut arena = BumbAlloc::build(LENGTH);
 
-        let ptr_1 = arena.append_with(&foo_layout).cast::<Foo>();
+        let ptr_1 = arena.push(&foo_layout).cast::<Foo>();
         assert_eq!(arena.used_bytes, foo_layout.size());
 
-        let ptr_2 = arena.append_with(&boo_layout).cast::<Boo>();
+        let ptr_2 = arena.push(&boo_layout).cast::<Boo>();
         let prev_area_used_bytes = 16;
         assert_eq!(arena.used_bytes, prev_area_used_bytes + boo_layout.size());
 
@@ -219,6 +205,6 @@ mod test {
             dbg!(ptr_2);
             dbg!(ptr_2.read());
         }
-        arena.bumb();
+        arena.clear();
     }
 }
