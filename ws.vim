@@ -10,11 +10,15 @@ if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
 endif
 let s:shortmess_save = &shortmess
 set shortmess+=aoO
-badd +23 src/lib.rs
-badd +15 README.md
+badd +4 src/lib.rs
+badd +18 README.md
+badd +1 term://~/Projects/random/arenas-rs//2636382:/bin/bash
 argglobal
 %argdel
-$argadd .
+$argadd ./
+set stal=2
+tabnew +setlocal\ bufhidden=wipe
+tabrewind
 edit src/lib.rs
 let s:save_splitbelow = &splitbelow
 let s:save_splitright = &splitright
@@ -32,8 +36,8 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
-exe 'vert 1resize ' . ((&columns * 71 + 73) / 147)
-exe 'vert 2resize ' . ((&columns * 75 + 73) / 147)
+exe 'vert 1resize ' . ((&columns * 109 + 106) / 212)
+exe 'vert 2resize ' . ((&columns * 102 + 106) / 212)
 argglobal
 balt README.md
 setlocal foldmethod=manual
@@ -46,19 +50,19 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 13 - ((12 * winheight(0) + 16) / 32)
+let s:l = 4 - ((3 * winheight(0) + 21) / 43)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 13
-normal! 0
+keepjumps 4
+normal! 08|
 wincmd w
 argglobal
-if bufexists(fnamemodify("README.md", ":p")) | buffer README.md | else | edit README.md | endif
+if bufexists(fnamemodify("term://~/Projects/random/arenas-rs//2636382:/bin/bash", ":p")) | buffer term://~/Projects/random/arenas-rs//2636382:/bin/bash | else | edit term://~/Projects/random/arenas-rs//2636382:/bin/bash | endif
 if &buftype ==# 'terminal'
-  silent file README.md
+  silent file term://~/Projects/random/arenas-rs//2636382:/bin/bash
 endif
-balt src/lib.rs
+balt README.md
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -66,20 +70,38 @@ setlocal foldignore=#
 setlocal foldlevel=0
 setlocal foldminlines=1
 setlocal foldnestmax=20
-setlocal nofoldenable
-silent! normal! zE
-let &fdl = &fdl
-let s:l = 15 - ((14 * winheight(0) + 16) / 32)
+setlocal foldenable
+let s:l = 1 - ((0 * winheight(0) + 21) / 43)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 15
-normal! 033|
+keepjumps 1
+normal! 0
 wincmd w
-2wincmd w
-exe 'vert 1resize ' . ((&columns * 71 + 73) / 147)
-exe 'vert 2resize ' . ((&columns * 75 + 73) / 147)
+exe 'vert 1resize ' . ((&columns * 109 + 106) / 212)
+exe 'vert 2resize ' . ((&columns * 102 + 106) / 212)
+tabnext
+edit README.md
+argglobal
+balt term://~/Projects/random/arenas-rs//2636382:/bin/bash
+setlocal foldmethod=manual
+setlocal foldexpr=0
+setlocal foldmarker={{{,}}}
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldenable
+silent! normal! zE
+let &fdl = &fdl
+let s:l = 31 - ((30 * winheight(0) + 21) / 43)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 31
+normal! 042|
 tabnext 1
+set stal=1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
 endif
@@ -94,6 +116,7 @@ if filereadable(s:sx)
 endif
 let &g:so = s:so_save | let &g:siso = s:siso_save
 set hlsearch
+nohlsearch
 doautoall SessionLoadPost
 unlet g:SessionLoad
 " vim: set ft=vim :

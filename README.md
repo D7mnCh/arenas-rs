@@ -26,7 +26,7 @@ it is the simpliest allocator, it just allocates or deallactes memory, no fancy 
 #### challenges
 - the only challenge you'll face is aligning data (give data valid memory address that is based on the data alignment), you gonna offset the pointer by adding padding (if needed) that are result of aligning data, and by adding also data size to the offset value for the pointer, lukcy for us rust does have a method for aligning data "align_offset" method. for increamenting used bytes value, it equals to the offset value, cuz we are not restrict to arena alignemnt, which equals to 1
 > [!NOTE]
-> if you want to align the data, without rust method, you only need the modular of current used bytes by data alignment, that used to substract data alignment with it
+> if you want to align the data, without rust's method, you only need the modular of current used bytes by data alignment, that used to substract data alignment with it
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 
@@ -51,7 +51,7 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
     - in order to align a data, you need to offset the pointer forward, you'll have padding between the prev and current pos of the pointer
     - 1 padding = 1 byte
     - padding between allocation do count/add as/to arena's used bytes, but they didn't count as used space( no data owns it)
-    - padding can be also when the size of struct/enum is not multiple of its alignment, so that value will have padding at the end called `trailled padding`
+    - padding can be also when the size of struct/enum is not multiple of its alignment, that padding at the end called `trailled padding`
 
 - `memory currpetion` means a pointer writes to or reads from memory it shouldn't (can be inside or outside the allocation), can lead to undefined behavior
 - `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
