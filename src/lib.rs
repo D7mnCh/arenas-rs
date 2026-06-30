@@ -23,15 +23,12 @@ impl Arena {
         let layout = Layout::from_size_align(size, ALIGNMENT)
             .expect("requested length pass the boundry and wrapped to negative value");
 
-        // size could be less or more depend if size is multiple of alignment or not
-        let arena_size = layout.size();
-        log_arena_size(arena_size);
-
-        let ptr = unsafe { alloc_zeroed(layout) };
+        let start_ptr = unsafe { alloc_zeroed(layout) };
+        log_arena_info(&layout, start_ptr);
 
         Self {
-            tracker: ptr,
-            start: ptr,
+            tracker: start_ptr,
+            start: start_ptr,
             used_bytes: 0,
             layout,
         }
@@ -51,16 +48,16 @@ impl Arena {
 
 struct StackAlloc {
     arena: Arena,
-    prev_tracker: *mut u8,
-    prev_allocation_size: usize,
+    prev_trackers: Vec<*mut u8>,
+    prev_allocation_sizes: Vec<usize>,
 }
 
 impl StackAlloc {
     fn build(length: usize) -> Self {
         Self {
             arena: Arena::build(length),
-            prev_allocation_size: 0,
-            prev_tracker: ptr::null_mut(),
+            prev_allocation_sizes: Vec::new(),
+            prev_trackers: Vec::new(),
         }
     }
 
@@ -72,60 +69,73 @@ impl StackAlloc {
         log_push(requested_bytes, padding);
 
         if self.arena.layout.size() >= self.arena.used_bytes + bytes_to_push {
-            self.prev_tracker = self.arena.tracker;
+            // prev_trackers used on pop method
+            self.prev_trackers.push(self.arena.tracker);
+            // safe to unwrap, cuz i am pushing to prev_trackers before
+            //i use it, so always will be a value inside the colliction
+            let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
 
             // update tracker
             let offset = padding + requested_bytes;
             unsafe {
                 self.arena.tracker = self.arena.tracker.add(offset);
             }
-            log_tracker(self.prev_tracker, self.arena.tracker);
+            log_tracker(prev_tracker, self.arena.tracker);
 
             // update used bytes
             self.arena.used_bytes += bytes_to_push;
             log_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
 
-            // used later on pop method
-            self.prev_allocation_size = bytes_to_push;
+            // prev_allocation_sizes used on pop method
+            self.prev_allocation_sizes.push(bytes_to_push);
+
+            let remaining = self
+                .arena
+                .layout
+                .size()
+                .saturating_sub(self.arena.used_bytes);
+            log_remaining_space(remaining);
+
+            return prev_tracker;
         } else {
-            eprintln!("[ERROR] requested allocation is more then arena's remaining space",);
-            // used to pop it
-            self.prev_tracker = ptr::null_mut();
-        };
-
-        let remaining = self
-            .arena
-            .layout
-            .size()
-            .saturating_sub(self.arena.used_bytes);
-        log_remaining_space(remaining);
-
-        self.prev_tracker
+            log_warning_arena_is_full();
+            return ptr::null_mut();
+        }
     }
 
     fn pop(&mut self) {
-        // update used_bytes
-        log_pop(
-            self.prev_tracker,
-            self.arena.tracker,
-            self.arena.used_bytes,
-            self.prev_allocation_size,
-        );
+        if self.arena.used_bytes != 0 {
+            // safe to call unwrap cuz if used_bytes != 0, there's an element
+            // inside the collictions
+            let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
+            let prev_allocation_size = self.prev_allocation_sizes.last().unwrap().to_owned();
 
-        self.arena.used_bytes = self
-            .arena
-            .used_bytes
-            .saturating_sub(self.prev_allocation_size);
+            // if get not "enough space" warning when tried to push or there's no used_bytes
+            // then don't pop(caller can call pop before even push method)
+            log_pop(
+                prev_tracker,
+                self.arena.tracker,
+                prev_allocation_size,
+                self.arena.used_bytes,
+            );
 
-        // update tracker
-        self.arena.tracker = self.prev_tracker;
+            // update used_bytes
+            self.arena.used_bytes = self.arena.used_bytes.saturating_sub(prev_allocation_size);
+            self.prev_allocation_sizes.pop();
+
+            // update tracker
+            self.arena.tracker = prev_tracker;
+            self.prev_trackers.pop();
+        } else {
+            log_warning_arena_is_empty();
+        }
     }
 
     fn uninitialize(&mut self) {
         self.arena.uninitialize();
 
-        self.prev_tracker = ptr::null_mut();
-        self.prev_allocation_size = 0;
+        self.prev_trackers = Vec::new();
+        self.prev_allocation_sizes = Vec::new();
     }
 
     pub fn clear(&mut self) {
@@ -176,7 +186,7 @@ impl BumbAlloc {
             self.arena.used_bytes += bytes_to_push;
             log_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
         } else {
-            eprintln!("[ERROR] requested allocation is more then arena's remaining space",);
+            log_warning_arena_is_full();
             prev_tracker = ptr::null_mut()
         };
 

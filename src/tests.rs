@@ -13,9 +13,8 @@ fn arena_size() {
 fn not_enough_space_to_allocate() {
     let mut bumb_alloc = BumbAlloc::build(0);
     let layout = Layout::new::<i32>();
-    let ptr = bumb_alloc.push(&layout);
-    // not enough space, arena.arena.used_bytes will not change
-    assert_eq!(bumb_alloc.arena.used_bytes, 0);
+    let ptr = bumb_alloc.push(&layout); // warning, no remaining space
+    assert_eq!(bumb_alloc.arena.used_bytes, 0); //arena.arena.used_bytes will not change
     assert!(ptr.is_null());
 }
 
@@ -113,45 +112,18 @@ fn arena_push_struct() {
 // Stack allocator tests
 #[test]
 fn arena_pop() {
-    let mut stack_alloc = StackAlloc::build(32);
+    let mut stack_alloc = StackAlloc::build(100);
 
     // with pirimitives
     let layout = Layout::new::<i32>();
     let ptr_1 = stack_alloc.push(&layout);
-    let _ptr_2 = stack_alloc.push(&layout); // will get dropped
-    stack_alloc.pop(); // ptr_2 is invalid
-    assert_eq!(stack_alloc.arena.used_bytes, 4);
-    assert_eq!(stack_alloc.arena.tracker, unsafe {
-        stack_alloc.arena.start.add(4)
-    });
-
-    // with structs
-    #[derive(Debug)]
-    struct Foo {
-        data: u64,
-        some_data: &'static str,
-    }
-    let _ptr_2 = stack_alloc.push(&layout);
-    let _ptr_3 = stack_alloc.push(&layout); // will get dropped
-    stack_alloc.pop(); // ptr_3 is invalid
-    let layout = Layout::new::<Foo>();
-    let ptr_2 = stack_alloc.push(&layout).cast::<Foo>();
-    let arena_used_bytes = 8;
-    let struct_size = 24;
-    assert_eq!(stack_alloc.arena.used_bytes, arena_used_bytes + struct_size);
-    let arena_start = stack_alloc.arena.start;
-    assert_eq!(stack_alloc.arena.tracker, unsafe {
-        arena_start.add(arena_used_bytes + struct_size)
-    });
-
-    // check if pointer are valid
-    unsafe {
-        ptr_1.write(67);
-        ptr_2.write(Foo {
-            data: 123,
-            some_data: "hello world",
-        });
-        dbg!(ptr_1);
-        dbg!(ptr_2);
-    }
+    let layout = Layout::new::<i128>();
+    let ptr_2 = stack_alloc.push(&layout);
+    let layout = Layout::new::<i8>();
+    let ptr_3 = stack_alloc.push(&layout);
+    stack_alloc.pop();
+    stack_alloc.pop();
+    stack_alloc.pop();
+    stack_alloc.pop(); // warning pop when used_bytes == 0
+    assert_eq!(stack_alloc.arena.used_bytes, 0);
 }

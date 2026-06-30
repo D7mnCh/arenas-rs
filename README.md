@@ -27,6 +27,7 @@ it is the simpliest allocator, it just allocates or deallactes memory, no fancy 
 - the only challenge you'll face is aligning data (give data valid memory address that is based on the data alignment), you gonna offset the pointer by adding padding (if needed) that are result of aligning data, and by adding also data size to the offset value for the pointer, lukcy for us rust does have a method for aligning data "align_offset" method. for increamenting used bytes value, it equals to the offset value, cuz we are not restrict to arena alignemnt, which equals to 1
 > [!NOTE]
 > if you want to align the data, without rust's method, you only need the modular of current used bytes by data alignment, that used to substract data alignment with it
+## Stack allocator
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 
