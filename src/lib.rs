@@ -9,8 +9,6 @@ use std::{
     ptr,
 };
 
-const ALIGNMENT: usize = 1;
-
 struct Arena {
     start: *mut u8,
     tracker: *mut u8,
@@ -20,6 +18,9 @@ struct Arena {
 
 impl Arena {
     fn build(size: usize) -> Self {
+        // NOTE there's no need for alignment to be more then 1, only if the caller want more then one arena 
+        const ALIGNMENT: usize = 1;
+
         let layout = Layout::from_size_align(size, ALIGNMENT)
             .expect("requested length pass the boundry and wrapped to negative value");
 
@@ -44,6 +45,14 @@ impl Arena {
     fn clear(&mut self) {
         unsafe { dealloc(self.start, self.layout) };
     }
+}
+
+// NOTE i need to have alignment for each block
+struct PollAlloc {
+    arena: Arena,
+    // NOTE when building this allocator, i must get all the pointers points to all blocks
+    trackers: Vec<*mut u8>,
+    block_free: Vec<bool>,
 }
 
 struct StackAlloc {

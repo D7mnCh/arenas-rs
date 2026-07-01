@@ -116,11 +116,11 @@ fn arena_pop() {
 
     // with pirimitives
     let layout = Layout::new::<i32>();
-    let ptr_1 = stack_alloc.push(&layout);
+    let _ptr_1 = stack_alloc.push(&layout);
     let layout = Layout::new::<i128>();
-    let ptr_2 = stack_alloc.push(&layout);
+    let _ptr_2 = stack_alloc.push(&layout);
     let layout = Layout::new::<i8>();
-    let ptr_3 = stack_alloc.push(&layout);
+    let _ptr_3 = stack_alloc.push(&layout);
     stack_alloc.pop();
     stack_alloc.pop();
     stack_alloc.pop();
