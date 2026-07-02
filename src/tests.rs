@@ -1,9 +1,22 @@
 use super::*;
-const LENGTH: usize = 1000;
+
+// poll allocator
+#[test]
+fn poll_allocator_blocks_tracker() {
+    const LENGTH: usize = 10;
+    let poll_alloc = PollAlloc::build(LENGTH, 2);
+
+    assert_eq!(poll_alloc.blocks[0].tracker, poll_alloc.arena.start);
+    unsafe {
+        assert_eq!(poll_alloc.blocks[1].tracker, poll_alloc.arena.start.add(2));
+        assert_eq!(poll_alloc.blocks[2].tracker, poll_alloc.arena.start.add(4));
+    }
+}
 
 /// bumb allocator tests
 #[test]
 fn arena_size() {
+    const LENGTH: usize = 1000;
     let bumb_alloc = BumbAlloc::build(LENGTH);
 
     assert_eq!(bumb_alloc.arena.layout.size(), LENGTH);
@@ -20,6 +33,7 @@ fn not_enough_space_to_allocate() {
 
 #[test]
 fn bumb_alloc() {
+    const LENGTH: usize = 1000;
     let mut bumb_alloc = BumbAlloc::build(LENGTH);
 
     let layout = Layout::new::<i32>();
@@ -37,6 +51,7 @@ fn bumb_alloc() {
 
 #[test]
 fn arena_push_primitives() {
+    const LENGTH: usize = 1000;
     let mut bumb_alloc = BumbAlloc::build(LENGTH);
 
     let layout = Layout::new::<[i16; 2]>();
@@ -65,6 +80,8 @@ fn arena_push_primitives() {
 
 #[test]
 fn arena_push_struct() {
+    const LENGTH: usize = 1000;
+
     #[derive(Debug)]
     struct Foo {
         data: bool,

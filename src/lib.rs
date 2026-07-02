@@ -9,6 +9,7 @@ use std::{
     ptr,
 };
 
+#[derive(Debug)]
 struct Arena {
     start: *mut u8,
     tracker: *mut u8,
@@ -18,11 +19,12 @@ struct Arena {
 
 impl Arena {
     fn build(size: usize) -> Self {
-        // NOTE there's no need for alignment to be more then 1, only if the caller want more then one arena 
+        // there's no need for alignment to be more then 1, only if the
+        //caller want more then one arena
         const ALIGNMENT: usize = 1;
 
         let layout = Layout::from_size_align(size, ALIGNMENT)
-            .expect("requested length pass the boundry and wrapped to negative value");
+            .expect("requested length pass isize::MAX boundry and wrapped to negative value");
 
         let start_ptr = unsafe { alloc_zeroed(layout) };
         log_arena_info(&layout, start_ptr);
@@ -47,24 +49,99 @@ impl Arena {
     }
 }
 
-// NOTE i need to have alignment for each block
+// NOTE poll allocator only have trailling padding
+#[derive(Debug)]
 struct PollAlloc {
     arena: Arena,
-    // NOTE when building this allocator, i must get all the pointers points to all blocks
-    trackers: Vec<*mut u8>,
-    block_free: Vec<bool>,
+    // each block share the same layout
+    blocks: Vec<Block>,
+}
+
+#[derive(Debug, PartialEq)]
+struct Block {
+    layout: Layout,
+    tracker: *mut u8,
+    is_used: bool,
+}
+
+impl Block {
+    fn build(layout: Layout, tracker: *mut u8) -> Self {
+        Self {
+            layout,
+            tracker,
+            is_used: false,
+        }
+    }
+}
+
+impl PollAlloc {
+    // while building, need to specify blocks's layout and there
+    //trackers
+    fn build(mut arena_size: usize, block_size: usize) -> Self {
+        // add to arena_size if arena_size % block_size != 0
+        let modulor = arena_size % block_size;
+        arena_size += block_size - modulor;
+        let num_blocks: usize = arena_size / block_size;
+
+        // need "start pointer" from arena to construct the blocks trackers
+        let arena = Arena::build(arena_size);
+        // constructing the blocks
+        let mut blocks: Vec<Block> = Vec::new();
+        let first_block_tracker = arena.start.clone();
+        let mut offset = 0;
+
+        for _block in 0..num_blocks {
+            let block_align = block_size;
+            let layout = Layout::from_size_align(block_size, block_align)
+                .expect("requested length pass isize::MAX boundry and wrapped to negative value");
+            let block_tracker: *mut u8;
+            unsafe {
+                block_tracker = first_block_tracker.add(offset);
+            }
+            let block = Block::build(layout, block_tracker);
+            blocks.push(block);
+            offset += block_size;
+        }
+
+        Self { arena, blocks }
+    }
+
+    fn push(&mut self, layout: &Layout) -> *mut u8 {
+        if layout.size() < self.blocks[0].layout.size() {
+            for (indx, block) in self.blocks.iter_mut().enumerate() {
+                // check if any block is available
+                if !block.is_used {
+                    block.is_used = true;
+                    return self.blocks[indx].tracker;
+                }
+            }
+            eprintln!("[WARNING] all blocks are reserved!");
+            return ptr::null_mut();
+        } else {
+            eprintln!("[WARNING] instance size is bigger then block size");
+            return ptr::null_mut();
+        }
+    }
+
+    // NOTE i think the caller give a tracker, then match that tracker
+    // to pop it out from the arena
+    fn pop(_tracker: *mut u8) {}
+
+    fn uninitialize() {}
+
+    fn clear() {}
 }
 
 struct StackAlloc {
     arena: Arena,
-    prev_trackers: Vec<*mut u8>,
     prev_allocation_sizes: Vec<usize>,
+    prev_trackers: Vec<*mut u8>,
 }
 
 impl StackAlloc {
-    fn build(length: usize) -> Self {
+    fn build(size: usize) -> Self {
         Self {
-            arena: Arena::build(length),
+            arena: Arena::build(size),
             prev_allocation_sizes: Vec::new(),
             prev_trackers: Vec::new(),
         }
