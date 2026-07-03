@@ -118,14 +118,22 @@ impl PollAlloc {
             eprintln!("[WARNING] all blocks are reserved!");
             return ptr::null_mut();
         } else {
-            eprintln!("[WARNING] instance size is bigger then block size");
+            eprintln!("[WARNING] instance's size is bigger then block's size");
             return ptr::null_mut();
         }
     }
 
-    // NOTE i think the caller give a tracker, then match that tracker
-    // to pop it out from the arena
-    fn pop(_tracker: *mut u8) {}
+    fn pop(&mut self, tracker: *mut u8) {
+        for block in self.blocks.iter_mut() {
+            if block.is_used && tracker == block.tracker {
+                //don't know if i need to clean that block
+                return block.is_used = false;
+            } else {
+                return eprintln!("[WARNINIG] block is unused (free) from the givin tracker");
+            }
+        }
+        eprintln!("[WARNING] tracker is not one of poll-allocator's trackers");
+    }
 
     fn uninitialize() {}
 
