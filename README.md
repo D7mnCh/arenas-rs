@@ -1,5 +1,5 @@
 # arenas-rs
-Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, free-list and pool allocators
+Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, poll and free-list allocators
 
 > [!NOTE]
 > most of the time when i say "allocate" i meant to allocate some block "inside" the region/arena
@@ -22,14 +22,25 @@ it is the simpliest allocator, it just allocates or deallactes memory, no fancy 
 - a "layout" know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed for dealloc () function
 - a "pointer" points to the beginning of the arena, in order to deallocate(bumbing) it later with dealloc() function
 - a "tracker pointer" that tracks where the "end of last data allocation pos", and tracks requested data start pos
-- "used bytes counter" that tracks "how many bytes" that are allocated to check if you can allocate more size, by comparing it with "arena size" and "requested-bytes"
+- "used-bytes-counter" that tracks "how many bytes" that are allocated to check if you can allocate more data by comparing it with "arena size", "requested-bytes" and padding(comes from aligning that data, which gives a data valid memory address)
 #### challenges
-- the only challenge you'll face is aligning data (give data valid memory address that is based on the data alignment), you gonna offset the pointer by adding padding (if needed) that are result of aligning data, and by adding also data size to the offset value for the pointer, lukcy for us rust does have a method for aligning data "align_offset" method. for increamenting used bytes value, it equals to the offset value, cuz we are not restrict to arena alignemnt, which equals to 1
+- the only challenge you'll face is offseting the tracker pointer for the next allocation,you need first to align current pointer for the requested-data alignment, then add to the tracker requasted-data size, lukcy for us rust does have a method for aligning data "align_offset()" method on a pointer type (our pointer tracker), so you need just to add requested-data size
 > [!NOTE]
-> if you want to align the data, without rust's method, you only need the modular of current used bytes by data alignment, that used to substract data alignment with it
+> if you want to align the data without rust's method, you only need the modular of current used bytes by data alignment, then use it to substract data alignment with it
 ## Stack allocator
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
+
+## Stack allocator
+- It's just like the leaner allocator, the only difference is poll allocator stores every tracker that comes from pushing data to the arena, and uses-bytes between each offset in order to pop the last allocated data
+> [!NOTE]
+> you might ask why we can't also pop last allocation rather then the last one, I would answer by there's another allocator that does what you ask but with tiny minor changes "the poll allocator"(Todo: i wanna make a jumb to the allocator if the user click on it )
+> (talk about why just poping from different places on the arena rather then the last one)
+### implimentation
+- Todo
+
+### Poll allocator
+### Todo
 
 # What i learned (Author's notes)
 
