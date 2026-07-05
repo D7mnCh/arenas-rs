@@ -68,3 +68,4 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 - `memory currpetion` means a pointer writes to or reads from memory it shouldn't (can be inside or outside the allocation), can lead to undefined behavior
 - `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
 - `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignemnt
+- `fragmentation fault` or `core dumb` is an error that occur when a program try to access memory from other program
