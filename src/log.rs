@@ -1,27 +1,28 @@
 use std::alloc::Layout;
 
+// NOTE i'll use log functions when the body is long, if it just one line
+//of code then write it inside the caller function
+// TODO remove functions that have one line of code
+// NOTE i should note what i learn beside project concepts
+
 pub fn log_arena_info(layout: &Layout, start_ptr: *const u8) {
     println!("[BUILD]");
-    println!("arena size      = {} B", layout.size());
-    println!("arena alignment = {}", layout.align());
+
+    let arena_size = layout.size();
+    let arena_align = layout.align();
+    dbg!(arena_size, arena_align);
+
     println!("arena start     = {:p}", start_ptr);
     println!();
 }
 
 pub fn log_push(request: usize, padding: usize) {
-    let total = request + padding;
-
     println!("[PUSH]");
-    println!("request    = {} b", request);
-    println!("padding    = {} b", padding);
-    println!("total      = {} b", total);
-}
 
-pub fn log_warning_arena_is_full() {
-    eprintln!("[WARNING] requested allocation is more then arena's remaining space",);
-}
-pub fn log_warning_arena_is_empty() {
-    eprintln!("[WARNING] can't pop, arena is empty!");
+    dbg!(request, padding);
+
+    let total = request + padding;
+    println!("total_to_push = {} b", total);
 }
 
 pub fn log_pop(
@@ -38,11 +39,8 @@ pub fn log_pop(
     println!();
 }
 
-pub fn log_tracker(old: *const u8, new: *const u8) {
-    println!("tracker    = {old:p} -> {new:p}");
-}
-
-pub fn log_used_bytes(old: usize, new: usize) {
+pub fn log_used_bytes(bytes_to_push: usize, new: usize) {
+    let old = new - bytes_to_push;
     println!("used_bytes = {old} -> {new}");
 }
 

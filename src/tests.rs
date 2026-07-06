@@ -12,6 +12,19 @@ fn poll_allocator_blocks_tracker() {
         assert_eq!(poll_alloc.blocks[2].tracker, poll_alloc.arena.start.add(4));
     }
 }
+#[test]
+fn poll_allocator_push() {
+    const LENGTH: usize = 4;
+    let mut poll_alloc = PollAlloc::build(LENGTH, 2);
+    let layout = Layout::new::<i16>();
+    poll_alloc.push(&layout);
+    poll_alloc.push(&layout);
+    poll_alloc.push(&layout); // warning: all blocks are used
+}
+
+//TODO
+#[test]
+fn poll_allocator_pop() {}
 
 /// bumb allocator tests
 #[test]

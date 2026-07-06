@@ -42,7 +42,7 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 ### Poll allocator
 ### Todo
 
-# What i learned (Author's notes)
+# What i learned (notes on memory concepts, author's notes), this section answored some question i have on memory)
 
 - each block in memroy represent an address, we deal with addresses as bytes, and hexdecimal number
 - rust std returend `u8`(a byte in size) as a pointee type, make pointer manipulation easy to resaon about cuz your are doing them with pure bytes
@@ -69,3 +69,6 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 - `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
 - `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignemnt
 - `fragmentation fault` or `core dumb` is an error that occur when a program try to access memory from other program
+
+# What i learnt (notes on other then memory concepts, this section is heavley for me)
+- don't make a function when the body is one ( i make logging with only one line of code instead of just write that line on the caller function)

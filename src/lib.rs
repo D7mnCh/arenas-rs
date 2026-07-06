@@ -49,7 +49,9 @@ impl Arena {
     }
 }
 
-// NOTE poll allocator only have trailling padding
+// NOTE poll allocator only have trailling padding, cuz when building
+//the allocator i already build the blocks(allocate), i just need to
+// change what inside the data
 #[derive(Debug)]
 struct PollAlloc {
     arena: Arena,
@@ -78,13 +80,25 @@ impl PollAlloc {
     // while building, need to specify blocks's layout and there
     //trackers
     fn build(mut arena_size: usize, block_size: usize) -> Self {
-        // add to arena_size if arena_size % block_size != 0
+        // add to arena_size if arena_size % block_size != 0, to get zero
+        // trailling padding
+        // FIX BUG
         let modulor = arena_size % block_size;
-        arena_size += block_size - modulor;
+        arena_size += if modulor != 0 {
+            let add = block_size - modulor;
+            println!(
+                "[WARNING] adding to arena size {add} bytes to make it multiple of num of blocks"
+            );
+            add
+        } else {
+            0
+        };
         let num_blocks: usize = arena_size / block_size;
+        dbg!(num_blocks);
 
         // need "start pointer" from arena to construct the blocks trackers
         let arena = Arena::build(arena_size);
+
         // constructing the blocks
         let mut blocks: Vec<Block> = Vec::new();
         let first_block_tracker = arena.start.clone();
@@ -102,15 +116,20 @@ impl PollAlloc {
             blocks.push(block);
             offset += block_size;
         }
+        dbg!(&blocks);
 
         Self { arena, blocks }
     }
 
+    // TODO test
     fn push(&mut self, layout: &Layout) -> *mut u8 {
-        if layout.size() < self.blocks[0].layout.size() {
+        log_push(layout.size(), 0);
+
+        if layout.size() <= self.blocks[0].layout.size() {
             for (indx, block) in self.blocks.iter_mut().enumerate() {
                 // check if any block is available
                 if !block.is_used {
+                    println!("[INFO] found block not used to return her tracker ");
                     block.is_used = true;
                     return self.blocks[indx].tracker;
                 }
@@ -123,20 +142,29 @@ impl PollAlloc {
         }
     }
 
+    // TODO test
     fn pop(&mut self, tracker: *mut u8) {
-        for block in self.blocks.iter_mut() {
-            if block.is_used && tracker == block.tracker {
-                //don't know if i need to clean that block
+        // FIXED BUG
+        // check if tracker is valid
+        let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == tracker);
+
+        if let Some(block) = check_block_valid {
+            println!("[INFO] found tracker to a block");
+            if block.is_used {
+                println!("[INFO] make tracker to block empty");
                 return block.is_used = false;
             } else {
                 return eprintln!("[WARNINIG] block is unused (free) from the givin tracker");
             }
+        } else {
+            eprintln!("[WARNING] tracker is not one of poll-allocator's trackers");
         }
-        eprintln!("[WARNING] tracker is not one of poll-allocator's trackers");
     }
 
+    // TODO
     fn uninitialize() {}
 
+    //TODO
     fn clear() {}
 }
 
@@ -174,7 +202,11 @@ impl StackAlloc {
             unsafe {
                 self.arena.tracker = self.arena.tracker.add(offset);
             }
-            log_tracker(prev_tracker, self.arena.tracker);
+            println!(
+                "tracker    = {old:p} -> {new:p}",
+                old = prev_tracker,
+                new = self.arena.tracker
+            );
 
             // update used bytes
             self.arena.used_bytes += bytes_to_push;
@@ -192,7 +224,7 @@ impl StackAlloc {
 
             return prev_tracker;
         } else {
-            log_warning_arena_is_full();
+            eprintln!("[WARNING] requested allocation is more then arena's remaining space",);
             return ptr::null_mut();
         }
     }
@@ -221,7 +253,7 @@ impl StackAlloc {
             self.arena.tracker = prev_tracker;
             self.prev_trackers.pop();
         } else {
-            log_warning_arena_is_empty();
+            eprintln!("[WARNING] can't pop, arena is empty!");
         }
     }
 
@@ -274,13 +306,17 @@ impl BumbAlloc {
             unsafe {
                 self.arena.tracker = self.arena.tracker.add(offset);
             }
-            log_tracker(prev_tracker, self.arena.tracker);
+            println!(
+                "tracker    = {old:p} -> {new:p}",
+                old = prev_tracker,
+                new = self.arena.tracker
+            );
 
             // update used bytes
             self.arena.used_bytes += bytes_to_push;
-            log_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
+            log_used_bytes(bytes_to_push, self.arena.used_bytes);
         } else {
-            log_warning_arena_is_full();
+            eprintln!("[WARNING] requested allocation is more then arena's remaining space",);
             prev_tracker = ptr::null_mut()
         };
 
