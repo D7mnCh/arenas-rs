@@ -1,34 +1,45 @@
 use super::*;
 
-// poll allocator
-#[test]
-fn poll_allocator_blocks_tracker() {
-    const LENGTH: usize = 10;
-    let poll_alloc = PollAlloc::build(LENGTH, 2);
+// pool allocator
 
-    assert_eq!(poll_alloc.blocks[0].tracker, poll_alloc.arena.start);
+#[test]
+fn pool_allocator_blocks_tracker() {
+    const LENGTH: usize = 10;
+    let pool_alloc = PollAlloc::build(LENGTH, 2);
+
+    assert_eq!(pool_alloc.blocks[0].tracker, pool_alloc.arena.start);
     unsafe {
-        assert_eq!(poll_alloc.blocks[1].tracker, poll_alloc.arena.start.add(2));
-        assert_eq!(poll_alloc.blocks[2].tracker, poll_alloc.arena.start.add(4));
+        assert_eq!(pool_alloc.blocks[1].tracker, pool_alloc.arena.start.add(2));
+        assert_eq!(pool_alloc.blocks[2].tracker, pool_alloc.arena.start.add(4));
     }
 }
+
 #[test]
-fn poll_allocator_push() {
+fn pool_alloc_push_all_blocks_being_used() {
     const LENGTH: usize = 4;
-    let mut poll_alloc = PollAlloc::build(LENGTH, 2);
+    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
     let layout = Layout::new::<i16>();
-    poll_alloc.push(&layout);
-    poll_alloc.push(&layout);
-    poll_alloc.push(&layout); // warning: all blocks are used
+    pool_alloc.push(&layout);
+    pool_alloc.push(&layout);
+    let pointer = pool_alloc.push(&layout);
+    assert!(pointer.is_null()); // all blocks being used
+}
+#[test]
+fn pool_alloc_push_instance_is_bigger_then_block_size() {
+    const LENGTH: usize = 4;
+    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
+    let layout = Layout::new::<i32>();
+    let pointer = pool_alloc.push(&layout);
+    assert!(pointer.is_null()); // instance's size is bigger then block's size
 }
 
 //TODO
 #[test]
-fn poll_allocator_pop() {}
+fn pool_allocator_pop() {}
 
 /// bumb allocator tests
 #[test]
-fn arena_size() {
+fn bumb_alloc_size() {
     const LENGTH: usize = 1000;
     let bumb_alloc = BumbAlloc::build(LENGTH);
 
@@ -36,7 +47,7 @@ fn arena_size() {
 }
 
 #[test]
-fn not_enough_space_to_allocate() {
+fn bumb_alloc_not_enough_space_to_allocate() {
     let mut bumb_alloc = BumbAlloc::build(0);
     let layout = Layout::new::<i32>();
     let ptr = bumb_alloc.push(&layout); // warning, no remaining space
@@ -45,7 +56,7 @@ fn not_enough_space_to_allocate() {
 }
 
 #[test]
-fn bumb_alloc() {
+fn bumb_alloc_build() {
     const LENGTH: usize = 1000;
     let mut bumb_alloc = BumbAlloc::build(LENGTH);
 
@@ -63,7 +74,7 @@ fn bumb_alloc() {
 }
 
 #[test]
-fn arena_push_primitives() {
+fn bumb_alloc_push_primitives() {
     const LENGTH: usize = 1000;
     let mut bumb_alloc = BumbAlloc::build(LENGTH);
 
@@ -92,7 +103,7 @@ fn arena_push_primitives() {
 }
 
 #[test]
-fn arena_push_struct() {
+fn bumb_alloc_push_struct() {
     const LENGTH: usize = 1000;
 
     #[derive(Debug)]
@@ -141,7 +152,7 @@ fn arena_push_struct() {
 
 // Stack allocator tests
 #[test]
-fn arena_pop() {
+fn stack_alloc_pop() {
     let mut stack_alloc = StackAlloc::build(100);
 
     // with pirimitives

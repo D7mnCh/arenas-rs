@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-mod log;
 #[cfg(test)]
 mod tests;
 
@@ -27,7 +26,7 @@ impl Arena {
             .expect("requested length pass isize::MAX boundry and wrapped to negative value");
 
         let start_ptr = unsafe { alloc_zeroed(layout) };
-        log_arena_info(&layout, start_ptr);
+        log_arena_build(&layout, start_ptr);
 
         Self {
             tracker: start_ptr,
@@ -49,7 +48,7 @@ impl Arena {
     }
 }
 
-// NOTE poll allocator only have trailling padding, cuz when building
+// NOTE pool allocator only have trailling padding, cuz when building
 //the allocator i already build the blocks(allocate), i just need to
 // change what inside the data
 #[derive(Debug)]
@@ -82,7 +81,6 @@ impl PollAlloc {
     fn build(mut arena_size: usize, block_size: usize) -> Self {
         // add to arena_size if arena_size % block_size != 0, to get zero
         // trailling padding
-        // FIX BUG
         let modulor = arena_size % block_size;
         arena_size += if modulor != 0 {
             let add = block_size - modulor;
@@ -93,11 +91,9 @@ impl PollAlloc {
         } else {
             0
         };
-        let num_blocks: usize = arena_size / block_size;
-        dbg!(num_blocks);
-
         // need "start pointer" from arena to construct the blocks trackers
         let arena = Arena::build(arena_size);
+        let num_blocks: usize = arena_size / block_size;
 
         // constructing the blocks
         let mut blocks: Vec<Block> = Vec::new();
@@ -116,14 +112,15 @@ impl PollAlloc {
             blocks.push(block);
             offset += block_size;
         }
-        dbg!(&blocks);
+
+        log_pool_alloc_build(num_blocks, &blocks);
 
         Self { arena, blocks }
     }
 
     // TODO test
     fn push(&mut self, layout: &Layout) -> *mut u8 {
-        log_push(layout.size(), 0);
+        log_push("POOL", layout.size(), 0);
 
         if layout.size() <= self.blocks[0].layout.size() {
             for (indx, block) in self.blocks.iter_mut().enumerate() {
@@ -131,20 +128,22 @@ impl PollAlloc {
                 if !block.is_used {
                     println!("[INFO] found block not used to return her tracker ");
                     block.is_used = true;
+                    log_free_blocks(&self.blocks);
                     return self.blocks[indx].tracker;
                 }
             }
             eprintln!("[WARNING] all blocks are reserved!");
+            log_free_blocks(&self.blocks);
             return ptr::null_mut();
         } else {
             eprintln!("[WARNING] instance's size is bigger then block's size");
+            log_free_blocks(&self.blocks);
             return ptr::null_mut();
         }
     }
 
     // TODO test
     fn pop(&mut self, tracker: *mut u8) {
-        // FIXED BUG
         // check if tracker is valid
         let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == tracker);
 
@@ -157,7 +156,7 @@ impl PollAlloc {
                 return eprintln!("[WARNINIG] block is unused (free) from the givin tracker");
             }
         } else {
-            eprintln!("[WARNING] tracker is not one of poll-allocator's trackers");
+            eprintln!("[WARNING] tracker is not one of pool-allocator's trackers");
         }
     }
 
@@ -188,7 +187,7 @@ impl StackAlloc {
         let padding = self.arena.tracker.align_offset(layout.align());
         let bytes_to_push = padding + requested_bytes;
 
-        log_push(requested_bytes, padding);
+        log_push("STACK", requested_bytes, padding);
 
         if self.arena.layout.size() >= self.arena.used_bytes + bytes_to_push {
             // prev_trackers used on pop method
@@ -292,7 +291,7 @@ impl BumbAlloc {
         let padding = self.arena.tracker.align_offset(layout.align());
         let bytes_to_push = padding + requested_bytes;
 
-        log_push(requested_bytes, padding);
+        log_push("BUMB", requested_bytes, padding);
 
         // no need to make prev tracker as a field, as i only need it to
         //give it to the caller(unlick the stack allocator)
@@ -343,5 +342,86 @@ impl BumbAlloc {
 impl Drop for BumbAlloc {
     fn drop(&mut self) {
         self.clear();
+    }
+}
+
+mod log {
+    use super::Block;
+    use std::alloc::Layout;
+
+    pub fn log_arena_build(layout: &Layout, start_ptr: *const u8) {
+        println!("[ARENA BUILD]");
+
+        let arena_size = layout.size();
+        let arena_align = layout.align();
+        dbg!(arena_size, arena_align);
+
+        println!("arena start = {:p}", start_ptr);
+        println!();
+    }
+
+    pub fn log_pool_alloc_build(num_blocks: usize, blocks: &[Block]) {
+        println!("[POOL BUILD]");
+        println!("num blocks = {num_blocks}");
+        println!("block size = {size}", size = blocks[0].layout.size());
+        println!();
+
+        //log_show_blocks_trackers(blocks);
+    }
+
+    pub fn _log_show_blocks_tracker(blocks: &[Block]) {
+        println!("trackers :");
+        for (mut indx, block) in blocks.iter().enumerate() {
+            indx += 1;
+            println!("  {tracker:p} -> {indx} block", tracker = block.tracker);
+        }
+        println!();
+    }
+
+    pub fn log_free_blocks(blocks: &[Block]) {
+        let mut free_blocks = 0;
+
+        for block in blocks {
+            if block.is_used {
+                free_blocks += 1;
+            }
+        }
+
+        println!("free blocks = {free_blocks}");
+    }
+
+    // TODO don't like to have for all allocators this logging
+    pub fn log_push(alloc: &str, request: usize, padding: usize) {
+        println!("[{alloc} PUSH]");
+
+        dbg!(request, padding);
+
+        let total = request + padding;
+        println!("total = {} b", total);
+        println!();
+    }
+
+    pub fn log_pop(
+        old_tracker: *const u8,
+        new_tracker: *const u8,
+        old_used_bytes: usize,
+        current_used_bytes: usize,
+    ) {
+        let new_used_bytes = current_used_bytes.saturating_sub(old_used_bytes);
+
+        println!("[POP]");
+        println!("tracker    = {new_tracker:p} -> {old_tracker:p}");
+        println!("used_bytes = {current_used_bytes} -> {new_used_bytes}");
+        println!();
+    }
+
+    pub fn log_used_bytes(bytes_to_push: usize, new: usize) {
+        let old = new - bytes_to_push;
+        println!("used_bytes = {old} -> {new}");
+    }
+
+    pub fn log_remaining_space(remaining: usize) {
+        println!("remaining  = {remaining}");
+        println!();
     }
 }
