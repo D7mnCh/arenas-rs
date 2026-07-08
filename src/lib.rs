@@ -120,13 +120,13 @@ impl PollAlloc {
 
     // TODO make better logging
     fn push(&mut self, layout: &Layout) -> *mut u8 {
-        log_push("POOL", layout.size(), 0);
+        println!("[POOL PUSH]");
 
         if layout.size() <= self.blocks[0].layout.size() {
             for (indx, block) in self.blocks.iter_mut().enumerate() {
                 // check if any block is available
                 if !block.is_used {
-                    println!("[INFO] found free block to return a tracker to her");
+                    println!("[INFO] found tracker/free block");
                     block.is_used = true;
                     log_free_blocks(&self.blocks);
                     return self.blocks[indx].tracker;
@@ -237,7 +237,7 @@ impl StackAlloc {
 
             // if get not "enough space" warning when tried to push or there's no used_bytes
             // then don't pop(caller can call pop before even push method)
-            log_pop_stack(
+            log_stack_pop(
                 prev_tracker,
                 self.arena.tracker,
                 prev_allocation_size,
@@ -363,7 +363,7 @@ mod log {
     pub fn log_pool_pop(old: *const u8, new: *const u8) {
         println!("[POOL POP]");
         println!("[INFO] tracker : {old:p} -> {new:p}");
-        println!("[INFO] rest block from that tracker \"{old:p}\"");
+        println!("[INFO] reset block from that tracker \"{old:p}\"");
     }
 
     pub fn log_pool_alloc_build(num_blocks: usize, blocks: &[Block]) {
@@ -388,17 +388,15 @@ mod log {
         let mut free_blocks = 0;
 
         for block in blocks {
-            if block.is_used {
+            if !block.is_used {
                 free_blocks += 1;
             }
         }
 
-        println!("free blocks = {free_blocks}");
+        println!("free blocks = {free_blocks}",);
         println!();
     }
 
-    // NOTE didn't like to log this to all allocators
-    // NOTE need code review
     pub fn log_push(alloc: &str, request: usize, padding: usize) {
         println!("[{alloc} PUSH]");
 
@@ -408,7 +406,7 @@ mod log {
         println!("total = {} b", total);
     }
 
-    pub fn log_pop_stack(
+    pub fn log_stack_pop(
         old_tracker: *const u8,
         new_tracker: *const u8,
         old_used_bytes: usize,
