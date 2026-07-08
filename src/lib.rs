@@ -36,13 +36,6 @@ impl Arena {
         }
     }
 
-    fn uninitialize(&mut self) {
-        self.used_bytes = 0;
-        self.layout = Layout::new::<()>();
-        self.start = ptr::null_mut();
-        self.tracker = ptr::null_mut();
-    }
-
     fn clear(&mut self) {
         unsafe { dealloc(self.start, self.layout) };
     }
@@ -52,7 +45,7 @@ impl Arena {
 //the allocator i already build the blocks(allocate), i just need to
 // change what inside the data
 #[derive(Debug)]
-struct PollAlloc {
+struct PoolAlloc {
     arena: Arena,
     // each block share the same layout
     blocks: Vec<Block>,
@@ -75,7 +68,7 @@ impl Block {
     }
 }
 
-impl PollAlloc {
+impl PoolAlloc {
     // while building, need to specify blocks's layout and there
     //trackers
     fn build(mut arena_size: usize, block_size: usize) -> Self {
@@ -118,7 +111,6 @@ impl PollAlloc {
         Self { arena, blocks }
     }
 
-    // TODO make better logging
     fn push(&mut self, layout: &Layout) -> *mut u8 {
         println!("[POOL PUSH]");
 
@@ -160,11 +152,9 @@ impl PollAlloc {
         }
     }
 
-    // TODO
-    fn uninitialize() {}
-
-    //TODO
-    fn clear() {}
+    fn clear(&mut self) {
+        self.arena.clear();
+    }
 }
 
 struct StackAlloc {
@@ -256,16 +246,8 @@ impl StackAlloc {
         }
     }
 
-    fn uninitialize(&mut self) {
-        self.arena.uninitialize();
-
-        self.prev_trackers = Vec::new();
-        self.prev_allocation_sizes = Vec::new();
-    }
-
     pub fn clear(&mut self) {
         self.arena.clear();
-        self.uninitialize();
     }
 }
 
@@ -329,13 +311,8 @@ impl BumbAlloc {
         prev_tracker
     }
 
-    fn uninitialize(&mut self) {
-        self.arena.uninitialize();
-    }
-
     pub fn clear(&mut self) {
         self.arena.clear();
-        self.uninitialize();
     }
 }
 
