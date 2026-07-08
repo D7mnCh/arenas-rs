@@ -33,11 +33,26 @@ fn pool_alloc_push_instance_is_bigger_then_block_size() {
     assert!(pointer.is_null()); // instance's size is bigger then block's size
 }
 
-//TODO
 #[test]
-fn pool_allocator_pop() {}
+fn pool_allocator_pop() {
+    const LENGTH: usize = 4;
+    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
 
-/// bumb allocator tests
+    let layout = Layout::new::<i16>();
+    let _pointer_1 = pool_alloc.push(&layout);
+    let mut pointer_2 = pool_alloc.push(&layout);
+
+    unsafe {
+        assert_eq!(pool_alloc.blocks[0].tracker, pool_alloc.arena.start);
+        assert_eq!(pool_alloc.blocks[1].tracker, pool_alloc.arena.start.add(2));
+    }
+
+    pool_alloc.pop(&mut pointer_2);
+    assert!(pointer_2.is_null());
+    assert!(pool_alloc.blocks[1].is_used == false);
+}
+
+// bumb allocator tests
 #[test]
 fn bumb_alloc_size() {
     const LENGTH: usize = 1000;

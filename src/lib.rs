@@ -118,7 +118,7 @@ impl PollAlloc {
         Self { arena, blocks }
     }
 
-    // TODO test
+    // TODO make better logging
     fn push(&mut self, layout: &Layout) -> *mut u8 {
         log_push("POOL", layout.size(), 0);
 
@@ -126,7 +126,7 @@ impl PollAlloc {
             for (indx, block) in self.blocks.iter_mut().enumerate() {
                 // check if any block is available
                 if !block.is_used {
-                    println!("[INFO] found block not used to return her tracker ");
+                    println!("[INFO] found free block to return a tracker to her");
                     block.is_used = true;
                     log_free_blocks(&self.blocks);
                     return self.blocks[indx].tracker;
@@ -142,21 +142,21 @@ impl PollAlloc {
         }
     }
 
-    // TODO test
-    fn pop(&mut self, tracker: *mut u8) {
-        // check if tracker is valid
-        let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == tracker);
+    fn pop(&mut self, tracker: &mut *mut u8) {
+        let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == *tracker);
 
         if let Some(block) = check_block_valid {
-            println!("[INFO] found tracker to a block");
+            log_pool_pop(*tracker, ptr::null_mut());
             if block.is_used {
-                println!("[INFO] make tracker to block empty");
-                return block.is_used = false;
+                block.is_used = false;
+                block.tracker = ptr::null_mut();
+                *tracker = ptr::null_mut();
+                return;
             } else {
-                return eprintln!("[WARNINIG] block is unused (free) from the givin tracker");
+                return eprintln!("[WARNINIG] block is unused (free) from the givin tracker\n");
             }
         } else {
-            eprintln!("[WARNING] tracker is not one of pool-allocator's trackers");
+            eprintln!("[WARNING] tracker is not one of pool-allocator's trackers\n");
         }
     }
 
@@ -237,7 +237,7 @@ impl StackAlloc {
 
             // if get not "enough space" warning when tried to push or there's no used_bytes
             // then don't pop(caller can call pop before even push method)
-            log_pop(
+            log_pop_stack(
                 prev_tracker,
                 self.arena.tracker,
                 prev_allocation_size,
@@ -360,6 +360,12 @@ mod log {
         println!();
     }
 
+    pub fn log_pool_pop(old: *const u8, new: *const u8) {
+        println!("[POOL POP]");
+        println!("[INFO] tracker : {old:p} -> {new:p}");
+        println!("[INFO] rest block from that tracker \"{old:p}\"");
+    }
+
     pub fn log_pool_alloc_build(num_blocks: usize, blocks: &[Block]) {
         println!("[POOL BUILD]");
         println!("num blocks = {num_blocks}");
@@ -388,9 +394,11 @@ mod log {
         }
 
         println!("free blocks = {free_blocks}");
+        println!();
     }
 
-    // TODO don't like to have for all allocators this logging
+    // NOTE didn't like to log this to all allocators
+    // NOTE need code review
     pub fn log_push(alloc: &str, request: usize, padding: usize) {
         println!("[{alloc} PUSH]");
 
@@ -398,10 +406,9 @@ mod log {
 
         let total = request + padding;
         println!("total = {} b", total);
-        println!();
     }
 
-    pub fn log_pop(
+    pub fn log_pop_stack(
         old_tracker: *const u8,
         new_tracker: *const u8,
         old_used_bytes: usize,
@@ -409,7 +416,7 @@ mod log {
     ) {
         let new_used_bytes = current_used_bytes.saturating_sub(old_used_bytes);
 
-        println!("[POP]");
+        println!("[STACK POP]");
         println!("tracker    = {new_tracker:p} -> {old_tracker:p}");
         println!("used_bytes = {current_used_bytes} -> {new_used_bytes}");
         println!();
