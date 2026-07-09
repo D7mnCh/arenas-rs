@@ -132,7 +132,7 @@ impl PoolAlloc {
         }
     }
 
-    fn pop(&mut self, tracker: &mut *mut u8) {
+    fn remove(&mut self, tracker: &mut *mut u8) {
         let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == *tracker);
 
         if let Some(block) = check_block_valid {

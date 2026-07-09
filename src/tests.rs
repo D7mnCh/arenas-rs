@@ -34,7 +34,7 @@ fn pool_alloc_push_instance_is_bigger_then_block_size() {
 }
 
 #[test]
-fn pool_allocator_pop() {
+fn pool_allocator_remove() {
     const LENGTH: usize = 4;
     let mut pool_alloc = PoolAlloc::build(LENGTH, 2);
 
@@ -47,7 +47,7 @@ fn pool_allocator_pop() {
         assert_eq!(pool_alloc.blocks[1].tracker, pool_alloc.arena.start.add(2));
     }
 
-    pool_alloc.pop(&mut pointer_1);
+    pool_alloc.remove(&mut pointer_1);
     assert!(pointer_1.is_null());
     assert!(pool_alloc.blocks[0].is_used == false);
 }
