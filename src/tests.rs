@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn pool_allocator_blocks_tracker() {
     const LENGTH: usize = 10;
-    let pool_alloc = PollAlloc::build(LENGTH, 2);
+    let pool_alloc = PoolAlloc::build(LENGTH, 2);
 
     assert_eq!(pool_alloc.blocks[0].tracker, pool_alloc.arena.start);
     unsafe {
@@ -17,7 +17,7 @@ fn pool_allocator_blocks_tracker() {
 #[test]
 fn pool_alloc_push_all_blocks_being_used() {
     const LENGTH: usize = 4;
-    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
+    let mut pool_alloc = PoolAlloc::build(LENGTH, 2);
     let layout = Layout::new::<i16>();
     pool_alloc.push(&layout);
     pool_alloc.push(&layout);
@@ -27,7 +27,7 @@ fn pool_alloc_push_all_blocks_being_used() {
 #[test]
 fn pool_alloc_push_instance_is_bigger_then_block_size() {
     const LENGTH: usize = 4;
-    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
+    let mut pool_alloc = PoolAlloc::build(LENGTH, 2);
     let layout = Layout::new::<i32>();
     let pointer = pool_alloc.push(&layout);
     assert!(pointer.is_null()); // instance's size is bigger then block's size
@@ -36,7 +36,7 @@ fn pool_alloc_push_instance_is_bigger_then_block_size() {
 #[test]
 fn pool_allocator_pop() {
     const LENGTH: usize = 4;
-    let mut pool_alloc = PollAlloc::build(LENGTH, 2);
+    let mut pool_alloc = PoolAlloc::build(LENGTH, 2);
 
     let layout = Layout::new::<i16>();
     let _pointer_1 = pool_alloc.push(&layout);

@@ -69,8 +69,7 @@ impl Block {
 }
 
 impl PoolAlloc {
-    // while building, need to specify blocks's layout and there
-    //trackers
+    // first, specify blocks's layout and there trackers
     fn build(mut arena_size: usize, block_size: usize) -> Self {
         // add to arena_size if arena_size % block_size != 0, to get zero
         // trailling padding
@@ -84,15 +83,14 @@ impl PoolAlloc {
         } else {
             0
         };
-        // need "start pointer" from arena to construct the blocks trackers
+        // construct arena to get "start pointer"
         let arena = Arena::build(arena_size);
-        let num_blocks: usize = arena_size / block_size;
 
         // constructing the blocks
         let mut blocks: Vec<Block> = Vec::new();
         let first_block_tracker = arena.start.clone();
+        let num_blocks: usize = arena_size / block_size;
         let mut offset = 0;
-
         for _block in 0..num_blocks {
             let block_align = block_size;
             let layout = Layout::from_size_align(block_size, block_align)
@@ -191,15 +189,12 @@ impl StackAlloc {
             unsafe {
                 self.arena.tracker = self.arena.tracker.add(offset);
             }
-            println!(
-                "tracker    = {old:p} -> {new:p}",
-                old = prev_tracker,
-                new = self.arena.tracker
-            );
+
+            log_update_tracker(prev_tracker, self.arena.tracker);
 
             // update used bytes
             self.arena.used_bytes += bytes_to_push;
-            log_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
+            log_update_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
 
             // prev_allocation_sizes used on pop method
             self.prev_allocation_sizes.push(bytes_to_push);
@@ -213,20 +208,18 @@ impl StackAlloc {
 
             return prev_tracker;
         } else {
-            eprintln!("[WARNING] requested allocation is more then arena's remaining space",);
+            eprintln!("[WARNING] requested allocation is more then arena's remaining space\n");
             return ptr::null_mut();
         }
     }
 
     fn pop(&mut self) {
         if self.arena.used_bytes != 0 {
-            // safe to call unwrap cuz if used_bytes != 0, there's an element
-            // inside the collictions
+            // safe to call unwrap cuz if used_bytes != 0, there's alywas,
+            //an element inside the colliction
             let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
             let prev_allocation_size = self.prev_allocation_sizes.last().unwrap().to_owned();
 
-            // if get not "enough space" warning when tried to push or there's no used_bytes
-            // then don't pop(caller can call pop before even push method)
             log_stack_pop(
                 prev_tracker,
                 self.arena.tracker,
@@ -242,7 +235,7 @@ impl StackAlloc {
             self.arena.tracker = prev_tracker;
             self.prev_trackers.pop();
         } else {
-            eprintln!("[WARNING] can't pop, arena is empty!");
+            eprintln!("[WARNING] can't pop, arena is empty!\n");
         }
     }
 
@@ -287,17 +280,13 @@ impl BumbAlloc {
             unsafe {
                 self.arena.tracker = self.arena.tracker.add(offset);
             }
-            println!(
-                "tracker    = {old:p} -> {new:p}",
-                old = prev_tracker,
-                new = self.arena.tracker
-            );
+            log_update_tracker(prev_tracker, self.arena.tracker);
 
             // update used bytes
             self.arena.used_bytes += bytes_to_push;
-            log_used_bytes(bytes_to_push, self.arena.used_bytes);
+            log_update_used_bytes(bytes_to_push, self.arena.used_bytes);
         } else {
-            eprintln!("[WARNING] requested allocation is more then arena's remaining space",);
+            eprintln!("[WARNING] requested allocation is more then arena's remaining space\n",);
             prev_tracker = ptr::null_mut()
         };
 
@@ -339,6 +328,7 @@ mod log {
 
     pub fn log_pool_pop(old: *const u8, new: *const u8) {
         println!("[POOL POP]");
+        log_update_tracker(old, new);
         println!("[INFO] tracker : {old:p} -> {new:p}");
         println!("[INFO] reset block from that tracker \"{old:p}\"");
     }
@@ -397,7 +387,11 @@ mod log {
         println!();
     }
 
-    pub fn log_used_bytes(bytes_to_push: usize, new: usize) {
+    pub fn log_update_tracker(old: *const u8, new: *const u8) {
+        println!("tracker = {old:p} -> {new:p}",);
+    }
+
+    pub fn log_update_used_bytes(bytes_to_push: usize, new: usize) {
         let old = new - bytes_to_push;
         println!("used_bytes = {old} -> {new}");
     }
