@@ -1,17 +1,18 @@
 # arenas-rs
 Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, poll and free-list allocators
 
+# Concepts
 > [!NOTE]
 > most of the time when i say "allocate" i meant to allocate some block "inside" the region/arena
+>
 > i didn't impl any fancy data structure or algorithms to build allocator(e.g., linked-list), just simple naive approach
 
-# Concepts
 ## general purpose allocator
 it is the simpliest allocator, it just allocates or deallactes memory, no fancy methods or algorithms, in c or rust, it is the default allocator
 ## Bumb/leaner allocator
 - it basically can allocate memory leanery only in one direction, that's means you can't like deallocate prev allocation.
 > [!NOTE]
-> if you want an allocator that deallocate memory on the last allocation on the arena, consider reading about the next allocator (the stack allocator)
+> if you want an allocator that deallocate memory on the last allocation on the arena, consider reading about the next allocator [the stack allocator](#Stack-allocator)
 
 - if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bumb" came from!)
 ### implimentation 
@@ -33,8 +34,7 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 ## Stack allocator
 - It's just like the leaner allocator, the only difference is poll allocator stores metadata of every tracker that comes from pushing data to the arena, and uses-bytes between each offset in order to pop the last allocated data
 > [!NOTE]
-> you might ask why we can't also pop last allocation rather then the last one, I would answer by there's another allocator that does what you ask but with tiny minor changes "the poll allocator"(Todo: i wanna make a jumb to the allocator if the user click on it )
-> (talk about why just poping from different places on the arena rather then the last one)
+> you might ask why we can don't impl removing from different location rather the the alst one , I would answer by there's another allocator that does what you ask but with tiny minor changes [the pool allocator](#Pool-allocator)
 ### implimentation
 - `build` method: build the arena with a specific layout, with initializing previous tracker beside previous size allocation metadata of the stack allocator struct
 - `push` method: push data to the arena, returning a pointer to the start of it, storing tracker before the offseting and size of allocation (including padding)
@@ -46,7 +46,8 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-003/
 ## Pool allocator
-- this alloactor can allocate objects randomly with defined blocks that have the same size and alignmenta inside the arena, it will additionnaly stores layout,tracker and bool if it free to use as a Block strcut as metadata to pool allocator
+- this alloactor can allocate objects randomly with defined blocks that have the same layout (with size = alignment) inside the arena, it will additionnaly stores layout,tracker and bool if it free to use as a Block strcut as metadata to pool allocator. The pool allocator only have trailling padding, cuz when building the allocator, i already build the blocks(allocate), i just need to change what inside those blocks(data)
+
 ### implimentation
 - `build` method: build arena with specific layout and block size/alignment, constructing arena and tracker for each block
 - `push`  method: push data to arena by searching for available/free block, returing a pointer to that block

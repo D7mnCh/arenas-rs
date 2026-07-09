@@ -1,3 +1,6 @@
+// TODO inroduce modules
+// TODO inroduce associated functions to increase readability
+
 #![allow(dead_code)]
 #[cfg(test)]
 mod tests;
@@ -41,13 +44,9 @@ impl Arena {
     }
 }
 
-// NOTE pool allocator only have trailling padding, cuz when building
-//the allocator i already build the blocks(allocate), i just need to
-// change what inside the data
 #[derive(Debug)]
 struct PoolAlloc {
     arena: Arena,
-    // each block share the same layout
     blocks: Vec<Block>,
 }
 
@@ -83,7 +82,8 @@ impl PoolAlloc {
         } else {
             0
         };
-        // construct arena to get "start pointer"
+
+        // get "start pointer", and construct the allocator ofc
         let arena = Arena::build(arena_size);
 
         // constructing the blocks
