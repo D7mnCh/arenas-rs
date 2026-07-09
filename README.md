@@ -3,6 +3,7 @@ Building arenas (region-based) memorey allocators in rust, implementing bumb, st
 
 > [!NOTE]
 > most of the time when i say "allocate" i meant to allocate some block "inside" the region/arena
+> i didn't impl any fancy data structure or algorithms to build allocator(e.g., linked-list), just simple naive approach
 
 # Concepts
 ## general purpose allocator
@@ -14,34 +15,45 @@ it is the simpliest allocator, it just allocates or deallactes memory, no fancy 
 
 - if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bumb" came from!)
 ### implimentation 
-- we gonna impl
-    - `build` function: to build the arena with specific layout
-    - `push`  function: to push data to the arena, returning a pointer to the start of it
-    - `clear` function: to deallocate the arena
-#### what you gonna need ?
-- a "layout" know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed for dealloc () function
+- `build` method: build the arena with a specific layout
+- `push`  method: push data to the arena, returning a pointer to the start of it
+- `clear` method: deallocate the arena
+### what you gonna need ?
+- a "layout" to know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed as input for alloc/dealloc functions
 - a "pointer" points to the beginning of the arena, in order to deallocate(bumbing) it later with dealloc() function
 - a "tracker pointer" that tracks where the "end of last data allocation pos", and tracks requested data start pos
 - "used-bytes-counter" that tracks "how many bytes" that are allocated to check if you can allocate more data by comparing it with "arena size", "requested-bytes" and padding(comes from aligning that data, which gives a data valid memory address)
-#### challenges
+### challenges
 - the only challenge you'll face is offseting the tracker pointer for the next allocation,you need first to align current pointer for the requested-data alignment, then add to the tracker requasted-data size, lukcy for us rust does have a method for aligning data "align_offset()" method on a pointer type (our pointer tracker), so you need just to add requested-data size
 > [!NOTE]
 > if you want to align the data without rust's method, you only need the modular of current used bytes by data alignment, then use it to substract data alignment with it
-## Stack allocator
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 
 ## Stack allocator
-- It's just like the leaner allocator, the only difference is poll allocator stores every tracker that comes from pushing data to the arena, and uses-bytes between each offset in order to pop the last allocated data
+- It's just like the leaner allocator, the only difference is poll allocator stores metadata of every tracker that comes from pushing data to the arena, and uses-bytes between each offset in order to pop the last allocated data
 > [!NOTE]
 > you might ask why we can't also pop last allocation rather then the last one, I would answer by there's another allocator that does what you ask but with tiny minor changes "the poll allocator"(Todo: i wanna make a jumb to the allocator if the user click on it )
 > (talk about why just poping from different places on the arena rather then the last one)
 ### implimentation
-- Todo
-
-### Poll allocator
-### Todo
-
+- `build` method: build the arena with a specific layout, with initializing previous tracker beside previous size allocation metadata of the stack allocator struct
+- `push` method: push data to the arena, returning a pointer to the start of it, storing tracker before the offseting and size of allocation (including padding)
+- `pop` method: pop the last allocation from the arena using prev tracker and prev size allocation
+- `clear` method: to deallocate the arena
+### what you gonna need ?
+- same step as the bumb allocator
+- the only addition thing is to store prev tracker and prev allocation size in order to optionnaly pop it later
+### Resources
+https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-003/
+## Pool allocator
+- this alloactor can allocate objects randomly with defined blocks that have the same size and alignmenta inside the arena, it will additionnaly stores layout,tracker and bool if it free to use as a Block strcut as metadata to pool allocator
+### implimentation
+- `build` method: build arena with specific layout and block size/alignment, constructing arena and tracker for each block
+- `push`  method: push data to arena by searching for available/free block, returing a pointer to that block
+- `remove` method: get a tracker to a available block. make that block free to use
+- `clear` method: deallocate the arena
+### Resources
+https://www.gingerbill.org/article/2019/02/16/memory-allocation-strategies-004/
 # What i learned (notes on memory concepts, author's notes), this section answored some question i have on memory)
 
 - each block in memroy represent an address, we deal with addresses as bytes, and hexdecimal number
@@ -70,5 +82,5 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 - `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignemnt
 - `fragmentation fault` or `core dumb` is an error that occur when a program try to access memory from other program
 
-# What i learnt (notes on other then memory concepts, this section is heavley for me)
+# What i learnt (notes on other then memory concepts, this section is heavliy for me)
 - don't make a function when the body is one ( i make logging with only one line of code instead of just write that line on the caller function)

@@ -39,17 +39,17 @@ fn pool_allocator_pop() {
     let mut pool_alloc = PoolAlloc::build(LENGTH, 2);
 
     let layout = Layout::new::<i16>();
-    let _pointer_1 = pool_alloc.push(&layout);
-    let mut pointer_2 = pool_alloc.push(&layout);
+    let mut pointer_1 = pool_alloc.push(&layout);
+    let _pointer_2 = pool_alloc.push(&layout);
 
     unsafe {
         assert_eq!(pool_alloc.blocks[0].tracker, pool_alloc.arena.start);
         assert_eq!(pool_alloc.blocks[1].tracker, pool_alloc.arena.start.add(2));
     }
 
-    pool_alloc.pop(&mut pointer_2);
-    assert!(pointer_2.is_null());
-    assert!(pool_alloc.blocks[1].is_used == false);
+    pool_alloc.pop(&mut pointer_1);
+    assert!(pointer_1.is_null());
+    assert!(pool_alloc.blocks[0].is_used == false);
 }
 
 // bumb allocator tests
