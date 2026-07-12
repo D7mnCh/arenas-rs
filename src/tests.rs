@@ -1,7 +1,9 @@
-use super::*;
+use crate::arenas::{
+    bump_allocator::BumpAlloc, pool_allocator::PoolAlloc, stack_allocator::StackAlloc,
+};
+use std::alloc::Layout;
 
 // pool allocator
-
 #[test]
 fn pool_allocator_blocks_tracker() {
     const LENGTH: usize = 10;
@@ -68,26 +70,6 @@ fn bumb_alloc_not_enough_space_to_allocate() {
     let ptr = bumb_alloc.push(&layout); // warning, no remaining space
     assert_eq!(bumb_alloc.arena.used_bytes, 0); //arena.arena.used_bytes will not change
     assert!(ptr.is_null());
-}
-
-#[test]
-fn bumb_alloc_build() {
-    const LENGTH: usize = 1000;
-    let mut bumb_alloc = BumpAlloc::build(LENGTH);
-
-    let layout = Layout::new::<i32>();
-    let _ = bumb_alloc.push(&layout);
-
-    // NOTE clear will dealloc allocated chunck, i should have reinitliazation
-    //method to reset the fields values to be the same when create
-    //the allocator
-    //bumb_alloc.clear();
-    //assert_eq!(bumb_alloc.arena.layout.size(), 0);
-    //// can't have alignment of 0 bytes in rust
-    //assert_eq!(bumb_alloc.arena.layout.align(), 1);
-    //assert_eq!(bumb_alloc.arena.used_bytes, 0);
-    //assert_eq!(bumb_alloc.arena.tracker, ptr::null_mut());
-    //assert_eq!(bumb_alloc.arena.start, ptr::null_mut());
 }
 
 #[test]
@@ -179,7 +161,6 @@ fn stack_alloc_pop() {
     let _ptr_2 = stack_alloc.push(&layout);
     let layout = Layout::new::<i8>();
     let _ptr_3 = stack_alloc.push(&layout);
-    // NOTE i think this double free
     stack_alloc.pop();
     dbg!(&stack_alloc);
     stack_alloc.pop();
