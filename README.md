@@ -1,5 +1,5 @@
 # arenas-rs
-Building arenas (region-based) memorey allocators in rust, implementing bumb, stack, poll and free-list allocators
+Building arenas (region-based) memorey allocators in rust, implementing bump, stack, poll and free-list allocators
 
 # Concepts
 > [!NOTE]
@@ -9,19 +9,19 @@ Building arenas (region-based) memorey allocators in rust, implementing bumb, st
 
 ## general purpose allocator
 it is the simpliest allocator, it just allocates or deallactes memory, no fancy methods or algorithms, in c or rust, it is the default allocator
-## Bumb/leaner allocator
+## Bump/leaner allocator
 - it basically can allocate memory leanery only in one direction, that's means you can't like deallocate prev allocation.
 > [!NOTE]
 > if you want an allocator that deallocate memory on the last allocation on the arena, consider reading about the next allocator [the stack allocator](#Stack-allocator)
 
-- if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bumb" came from!)
+- if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bump" came from!)
 ### implimentation 
 - `build` method: build the arena with a specific layout
 - `push`  method: push data to the arena, returning a pointer to the start of it
 - `clear` method: deallocate the arena
 ### what you gonna need ?
 - a "layout" to know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed as input for alloc/dealloc functions
-- a "pointer" points to the beginning of the arena, in order to deallocate(bumbing) it later with dealloc() function
+- a "pointer" points to the beginning of the arena, in order to deallocate(bumping) it later with dealloc() function
 - a "tracker pointer" that tracks where the "end of last data allocation pos", and tracks requested data start pos
 - "used-bytes-counter" that tracks "how many bytes" that are allocated to check if you can allocate more data by comparing it with "arena size", "requested-bytes" and padding(comes from aligning that data, which gives a data valid memory address)
 ### challenges
@@ -41,7 +41,7 @@ https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 - `pop` method: pop the last allocation from the arena using prev tracker and prev size allocation
 - `clear` method: to deallocate the arena
 ### what you gonna need ?
-- same step as the bumb allocator
+- same step as the bump allocator
 - the only addition thing is to store prev tracker and prev allocation size in order to optionnaly pop it later
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-003/

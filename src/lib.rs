@@ -1,5 +1,6 @@
 // TODO inroduce modules
-// TODO inroduce associated functions to increase readability
+// TODO inroduce associated functions to increase readability, instead of
+// commenting
 
 #![allow(dead_code)]
 #[cfg(test)]
@@ -20,13 +21,15 @@ struct Arena {
 }
 
 impl Arena {
-    fn build(size: usize) -> Self {
+    pub fn build(size: usize) -> Self {
         // there's no need for alignment to be more then 1, only if the
-        //caller want more then one arena
+        // programmer want more then one arena instance
         const ALIGNMENT: usize = 1;
 
-        let layout = Layout::from_size_align(size, ALIGNMENT)
-            .expect("requested length pass isize::MAX boundry and wrapped to negative value");
+        let layout = Layout::from_size_align(size, ALIGNMENT).expect(
+            "requested length passed isize::MAX boundry \
+            and wrapped to negative value",
+        );
 
         let start_ptr = unsafe { alloc_zeroed(layout) };
         log_arena_build(&layout, start_ptr);
@@ -39,7 +42,15 @@ impl Arena {
         }
     }
 
-    fn clear(&mut self) {
+    fn bytes_to_push(&self, layout: &Layout) -> usize {
+        let requested_bytes = layout.size();
+        let padding = self.tracker.align_offset(layout.align());
+        let bytes = padding + requested_bytes;
+
+        bytes
+    }
+
+    pub fn clear(&mut self) {
         unsafe { dealloc(self.start, self.layout) };
     }
 }
@@ -58,7 +69,7 @@ struct Block {
 }
 
 impl Block {
-    fn build(layout: Layout, tracker: *mut u8) -> Self {
+    pub fn build(layout: Layout, tracker: *mut u8) -> Self {
         Self {
             layout,
             tracker,
@@ -68,40 +79,42 @@ impl Block {
 }
 
 impl PoolAlloc {
-    // first, specify blocks's layout and there trackers
-    fn build(mut arena_size: usize, block_size: usize) -> Self {
+    // to build need to specify blocks's layout and there trackers
+    pub fn build(mut arena_size: usize, block_size: usize) -> Self {
         // add to arena_size if arena_size % block_size != 0, to get zero
-        // trailling padding
+        //trailling padding
         let modulor = arena_size % block_size;
         arena_size += if modulor != 0 {
             let add = block_size - modulor;
             println!(
-                "[WARNING] adding to arena size {add} bytes to make it multiple of num of blocks"
+                "[WARNING] adding {add} bytes to arena size \
+                to make it a multiple of the number of blocks"
             );
             add
         } else {
             0
         };
 
-        // get "start pointer", and construct the allocator ofc
+        // get "start pointer", and to construct the allocator ofc
         let arena = Arena::build(arena_size);
 
         // constructing the blocks
         let mut blocks: Vec<Block> = Vec::new();
         let first_block_tracker = arena.start.clone();
         let num_blocks: usize = arena_size / block_size;
-        let mut offset = 0;
-        for _block in 0..num_blocks {
+        for indx in 0..num_blocks {
             let block_align = block_size;
-            let layout = Layout::from_size_align(block_size, block_align)
-                .expect("requested length pass isize::MAX boundry and wrapped to negative value");
+            let layout = Layout::from_size_align(block_size, block_align).expect(
+                "requested length passed isize::MAX boundry \
+                    and wrapped to negative value",
+            );
             let block_tracker: *mut u8;
+            let offset = indx * block_size;
             unsafe {
                 block_tracker = first_block_tracker.add(offset);
             }
             let block = Block::build(layout, block_tracker);
             blocks.push(block);
-            offset += block_size;
         }
 
         log_pool_alloc_build(num_blocks, &blocks);
@@ -109,7 +122,7 @@ impl PoolAlloc {
         Self { arena, blocks }
     }
 
-    fn push(&mut self, layout: &Layout) -> *mut u8 {
+    pub fn push(&mut self, layout: &Layout) -> *mut u8 {
         println!("[POOL PUSH]");
 
         if layout.size() <= self.blocks[0].layout.size() {
@@ -124,118 +137,29 @@ impl PoolAlloc {
             }
             eprintln!("[WARNING] all blocks are reserved!");
             log_free_blocks(&self.blocks);
-            return ptr::null_mut();
+            ptr::null_mut()
         } else {
             eprintln!("[WARNING] instance's size is bigger then block's size");
             log_free_blocks(&self.blocks);
-            return ptr::null_mut();
+            ptr::null_mut()
         }
     }
 
-    fn remove(&mut self, tracker: &mut *mut u8) {
-        let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == *tracker);
+    pub fn remove(&mut self, tracker: *mut u8) {
+        let check_block_valid = self.blocks.iter_mut().find(|x| x.tracker == tracker);
 
         if let Some(block) = check_block_valid {
-            log_pool_pop(*tracker, ptr::null_mut());
+            log_pool_pop(tracker, ptr::null_mut());
             if block.is_used {
                 block.is_used = false;
-                block.tracker = ptr::null_mut();
-                *tracker = ptr::null_mut();
-                return;
             } else {
-                return eprintln!("[WARNINIG] block is unused (free) from the givin tracker\n");
+                eprintln!(
+                    "[WARNINIG] block is unused (free) \
+                    from the givin tracker\n"
+                );
             }
         } else {
             eprintln!("[WARNING] tracker is not one of pool-allocator's trackers\n");
-        }
-    }
-
-    fn clear(&mut self) {
-        self.arena.clear();
-    }
-}
-
-struct StackAlloc {
-    arena: Arena,
-    prev_allocation_sizes: Vec<usize>,
-    prev_trackers: Vec<*mut u8>,
-}
-
-impl StackAlloc {
-    fn build(size: usize) -> Self {
-        Self {
-            arena: Arena::build(size),
-            prev_allocation_sizes: Vec::new(),
-            prev_trackers: Vec::new(),
-        }
-    }
-
-    fn push(&mut self, layout: &Layout) -> *mut u8 {
-        let requested_bytes = layout.size();
-        let padding = self.arena.tracker.align_offset(layout.align());
-        let bytes_to_push = padding + requested_bytes;
-
-        log_push("STACK", requested_bytes, padding);
-
-        if self.arena.layout.size() >= self.arena.used_bytes + bytes_to_push {
-            // prev_trackers used on pop method
-            self.prev_trackers.push(self.arena.tracker);
-            // safe to unwrap, cuz i am pushing to prev_trackers before
-            //i use it, so always will be a value inside the colliction
-            let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
-
-            // update tracker
-            let offset = padding + requested_bytes;
-            unsafe {
-                self.arena.tracker = self.arena.tracker.add(offset);
-            }
-
-            log_update_tracker(prev_tracker, self.arena.tracker);
-
-            // update used bytes
-            self.arena.used_bytes += bytes_to_push;
-            log_update_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
-
-            // prev_allocation_sizes used on pop method
-            self.prev_allocation_sizes.push(bytes_to_push);
-
-            let remaining = self
-                .arena
-                .layout
-                .size()
-                .saturating_sub(self.arena.used_bytes);
-            log_remaining_space(remaining);
-
-            return prev_tracker;
-        } else {
-            eprintln!("[WARNING] requested allocation is more then arena's remaining space\n");
-            return ptr::null_mut();
-        }
-    }
-
-    fn pop(&mut self) {
-        if self.arena.used_bytes != 0 {
-            // safe to call unwrap cuz if used_bytes != 0, there's alywas,
-            //an element inside the colliction
-            let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
-            let prev_allocation_size = self.prev_allocation_sizes.last().unwrap().to_owned();
-
-            log_stack_pop(
-                prev_tracker,
-                self.arena.tracker,
-                prev_allocation_size,
-                self.arena.used_bytes,
-            );
-
-            // update used_bytes
-            self.arena.used_bytes = self.arena.used_bytes.saturating_sub(prev_allocation_size);
-            self.prev_allocation_sizes.pop();
-
-            // update tracker
-            self.arena.tracker = prev_tracker;
-            self.prev_trackers.pop();
-        } else {
-            eprintln!("[WARNING] can't pop, arena is empty!\n");
         }
     }
 
@@ -244,58 +168,135 @@ impl StackAlloc {
     }
 }
 
-impl Drop for StackAlloc {
-    fn drop(&mut self) {
-        self.clear();
+#[derive(Debug)]
+struct StackAlloc {
+    arena: Arena,
+    prev_allocation_sizes: Vec<usize>,
+    prev_trackers: Vec<*mut u8>,
+}
+
+impl StackAlloc {
+    pub fn build(size: usize) -> Self {
+        Self {
+            arena: Arena::build(size),
+            prev_allocation_sizes: Vec::new(),
+            prev_trackers: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, layout: &Layout) -> *mut u8 {
+        let bytes_to_push = self.arena.bytes_to_push(&layout);
+        log_push("BUMB", &self.arena, &layout);
+
+        if self.arena.layout.size() < self.arena.used_bytes + bytes_to_push {
+            eprintln!(
+                "[WARNING] requested allocation \
+                is more then arena's remaining space\n"
+            );
+            let prev_tracker = ptr::null_mut();
+            log_remaining_space(&self.arena);
+
+            return prev_tracker;
+        }
+        // prev_trackers used on pop method to offset arena tracker to where
+        //he was last time
+        self.prev_trackers.push(self.arena.tracker);
+
+        let prev_tracker = self.arena.tracker;
+
+        // update tracker
+        let offset = bytes_to_push;
+        unsafe {
+            self.arena.tracker = self.arena.tracker.add(offset);
+        }
+        log_update_tracker(prev_tracker, self.arena.tracker);
+
+        // update used bytes
+        self.arena.used_bytes += bytes_to_push;
+        log_update_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
+
+        // prev_allocation_sizes used on pop method to reduce used_bytes to
+        //where it was last time
+        self.prev_allocation_sizes.push(bytes_to_push);
+
+        log_remaining_space(&self.arena);
+
+        prev_tracker
+    }
+
+    pub fn pop(&mut self) {
+        if self.arena.used_bytes == 0 {
+            return eprintln!("[WARNING] can't pop, arena is empty!\n");
+        }
+
+        // safe to call unwrap cuz if used_bytes != 0, there's alywas an
+        //element inside the colliction
+        let prev_tracker = self.prev_trackers.last().unwrap().to_owned();
+        let prev_allocation_size = self.prev_allocation_sizes.last().unwrap().to_owned();
+
+        log_stack_pop(
+            prev_tracker,
+            self.arena.tracker,
+            prev_allocation_size,
+            self.arena.used_bytes,
+        );
+
+        // update used_bytes by reducing it
+        self.arena.used_bytes = self.arena.used_bytes.saturating_sub(prev_allocation_size);
+        self.prev_allocation_sizes.pop();
+
+        // update tracker by offset it backward
+        self.arena.tracker = prev_tracker;
+        self.prev_trackers.pop();
+    }
+
+    pub fn clear(&mut self) {
+        self.arena.clear();
     }
 }
 
-struct BumbAlloc {
+struct BumpAlloc {
     arena: Arena,
 }
 
-impl BumbAlloc {
-    fn build(length: usize) -> Self {
+impl BumpAlloc {
+    pub fn build(length: usize) -> Self {
         Self {
             arena: Arena::build(length),
         }
     }
 
-    fn push(&mut self, layout: &Layout) -> *mut u8 {
-        let requested_bytes = layout.size();
-        let padding = self.arena.tracker.align_offset(layout.align());
-        let bytes_to_push = padding + requested_bytes;
+    // NOTE the only difference between stack and bump that they both push
+    // methods is 2-LOC
+    pub fn push(&mut self, layout: &Layout) -> *mut u8 {
+        let bytes_to_push = self.arena.bytes_to_push(&layout);
+        log_push("BUMB", &self.arena, &layout);
 
-        log_push("BUMB", requested_bytes, padding);
+        if self.arena.layout.size() < self.arena.used_bytes + bytes_to_push {
+            eprintln!(
+                "[WARNING] requested allocation \
+                is more then arena's remaining space\n",
+            );
+            let prev_tracker = ptr::null_mut();
+            log_remaining_space(&self.arena);
 
-        // no need to make prev tracker as a field, as i only need it to
-        //give it to the caller(unlick the stack allocator)
-        let prev_tracker: *mut u8;
+            return prev_tracker;
+        }
 
-        if self.arena.layout.size() >= self.arena.used_bytes + bytes_to_push {
-            prev_tracker = self.arena.tracker;
+        let prev_tracker = self.arena.tracker;
 
-            // update tracker
-            let offset = padding + requested_bytes;
-            unsafe {
-                self.arena.tracker = self.arena.tracker.add(offset);
-            }
-            log_update_tracker(prev_tracker, self.arena.tracker);
+        // update tracker
+        let offset = bytes_to_push;
+        unsafe {
+            self.arena.tracker = self.arena.tracker.add(offset);
+        }
+        log_update_tracker(prev_tracker, self.arena.tracker);
 
-            // update used bytes
-            self.arena.used_bytes += bytes_to_push;
-            log_update_used_bytes(bytes_to_push, self.arena.used_bytes);
-        } else {
-            eprintln!("[WARNING] requested allocation is more then arena's remaining space\n",);
-            prev_tracker = ptr::null_mut()
-        };
+        // update used bytes
+        self.arena.used_bytes += bytes_to_push;
+        log_update_used_bytes(bytes_to_push, self.arena.used_bytes);
 
-        let remaining = self
-            .arena
-            .layout
-            .size()
-            .saturating_sub(self.arena.used_bytes);
-        log_remaining_space(remaining);
+        log_remaining_space(&self.arena);
 
         prev_tracker
     }
@@ -305,14 +306,8 @@ impl BumbAlloc {
     }
 }
 
-impl Drop for BumbAlloc {
-    fn drop(&mut self) {
-        self.clear();
-    }
-}
-
 mod log {
-    use super::Block;
+    use super::{Arena, Block};
     use std::alloc::Layout;
 
     pub fn log_arena_build(layout: &Layout, start_ptr: *const u8) {
@@ -364,12 +359,15 @@ mod log {
         println!();
     }
 
-    pub fn log_push(alloc: &str, request: usize, padding: usize) {
+    pub fn log_push(alloc: &str, arena: &Arena, layout: &Layout) {
+        let requested_bytes = layout.size();
+        let padding = arena.tracker.align_offset(layout.align());
+
         println!("[{alloc} PUSH]");
 
-        dbg!(request, padding);
+        dbg!(requested_bytes, padding);
 
-        let total = request + padding;
+        let total = requested_bytes + padding;
         println!("total = {} b", total);
     }
 
@@ -396,8 +394,9 @@ mod log {
         println!("used_bytes = {old} -> {new}");
     }
 
-    pub fn log_remaining_space(remaining: usize) {
-        println!("remaining  = {remaining}");
+    pub fn log_remaining_space(arena: &Arena) {
+        let remaining = arena.layout.size().saturating_sub(arena.used_bytes);
+        println!("remaining = {remaining}");
         println!();
     }
 }
