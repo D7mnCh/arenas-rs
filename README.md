@@ -1,5 +1,5 @@
 # arenas-rs
-Building arenas (region-based) memorey allocators in rust, implementing bump, stack, poll and free-list allocators
+Building arenas (region-based) memorey allocators in [rust](https://rust-lang.org/), implementing bump, stack, poll and free-list allocators
 
 # Concepts
 > [!NOTE]

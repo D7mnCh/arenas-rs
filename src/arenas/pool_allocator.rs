@@ -43,7 +43,6 @@ impl PoolAlloc {
         return add;
     }
 
-    // NOTE i think i can use array instead to construct the vec
     fn construct_blocks(arena: &Arena, block_size: usize) -> Vec<Block> {
         let mut blocks: Vec<Block> = Vec::new();
         let first_block_tracker = arena.start.clone();

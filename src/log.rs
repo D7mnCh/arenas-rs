@@ -23,10 +23,10 @@ pub fn log_pool_alloc_build(num_blocks: usize, blocks: &[Block]) {
     println!("block size = {size}", size = blocks[0].layout.size());
     println!();
 
-    //log_show_blocks_trackers(blocks);
+    //_log_display_blocks_trackers(blocks);
 }
 
-pub fn _log_show_blocks_tracker(blocks: &[Block]) {
+pub fn _log_display_blocks_tracker(blocks: &[Block]) {
     println!("trackers :");
     for (mut indx, block) in blocks.iter().enumerate() {
         indx += 1;
