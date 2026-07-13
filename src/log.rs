@@ -12,11 +12,9 @@ pub fn log_arena_build(layout: &Layout, start_ptr: *const u8) {
     println!();
 }
 
-pub fn log_pool_pop(old: *const u8, new: *const u8) {
+pub fn log_pool_remove(tracker: *const u8) {
     println!("[POOL POP]");
-    log_update_tracker(old, new);
-    println!("[INFO] tracker : {old:p} -> {new:p}");
-    println!("[INFO] reset block from that tracker \"{old:p}\"");
+    println!("freeing a block from this tracker : {tracker:p}");
 }
 
 pub fn log_pool_alloc_build(num_blocks: usize, blocks: &[Block]) {

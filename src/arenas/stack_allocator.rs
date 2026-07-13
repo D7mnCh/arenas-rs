@@ -77,16 +77,21 @@ impl StackAlloc {
             self.arena.used_bytes,
         );
 
-        // update used_bytes by reducing it
-        self.arena.used_bytes = self.arena.used_bytes.saturating_sub(prev_allocation_size);
-        self.prev_allocation_sizes.pop();
-
-        // update tracker by offset it backward
-        self.arena.tracker = prev_tracker;
-        self.prev_trackers.pop();
+        self.backward_tracker(prev_tracker);
+        self.reduce_used_bytes(prev_allocation_size);
     }
 
     pub fn clear(&mut self) {
         self.arena.clear();
+    }
+
+    fn backward_tracker(&mut self, prev_tracker: *mut u8) {
+        self.arena.tracker = prev_tracker;
+        self.prev_trackers.pop();
+    }
+
+    fn reduce_used_bytes(&mut self, prev_allocation_size: usize) {
+        self.arena.used_bytes = self.arena.used_bytes.saturating_sub(prev_allocation_size);
+        self.prev_allocation_sizes.pop();
     }
 }
