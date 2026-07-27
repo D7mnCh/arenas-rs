@@ -85,3 +85,4 @@ https://www.gingerbill.org/article/2019/02/16/memory-allocation-strategies-004/
 
 # What i learnt (notes on other then memory concepts, this section is heavliy for me)
 - don't make a function when the body is one ( i make logging with only one line of code instead of just write that line on the caller function)
+- some one did the project in idiomatic rust -> https://rushter.com/blog/rust-memory-arenas
