@@ -8,63 +8,63 @@ Building arenas (region-based) memorey allocators in [rust](https://rust-lang.or
 > i didn't impl any fancy data structure or algorithms to build allocator(e.g., linked-list), just simple naive approach
 
 ## general purpose allocator
-it is the simpliest allocator, it just allocates or deallactes memory, no fancy methods or algorithms, in c or rust, it is the default allocator
+it is the simplest allocator, it just allocates or deallactes memory, no fancy methods or algorithms, in c or rust, it is the default allocator
 ## Bump/leaner allocator
 - it basically can allocate memory leanery only in one direction, that's means you can't like deallocate prev allocation.
 > [!NOTE]
 > if you want an allocator that deallocate memory on the last allocation on the arena, consider reading about the next allocator [the stack allocator](#Stack-allocator)
 
 - if you want deallocation, you'll need to deallocate all the region/arena all in once (that's where the name "bump" came from!)
-### implimentation 
+### implementation
 - `build` method: build the arena with a specific layout
 - `push`  method: push data to the arena, returning a pointer to the start of it
 - `clear` method: deallocate the arena
 ### what you gonna need ?
-- a "layout" to know the size of the arena(we only using size of the layout, won't using alignemnt cuz its 1), and also needed as input for alloc/dealloc functions
+- a "layout" to know the size of the arena(we only using size of the layout, won't using alignment cuz its 1), and also needed as input for alloc/dealloc functions
 - a "pointer" points to the beginning of the arena, in order to deallocate(bumping) it later with dealloc() function
 - a "tracker pointer" that tracks where the "end of last data allocation pos", and tracks requested data start pos
 - "used-bytes-counter" that tracks "how many bytes" that are allocated to check if you can allocate more data by comparing it with "arena size", "requested-bytes" and padding(comes from aligning that data, which gives a data valid memory address)
 ### challenges
-- the only challenge you'll face is offseting the tracker pointer for the next allocation,you need first to align current pointer for the requested-data alignment, then add to the tracker requasted-data size, lukcy for us rust does have a method for aligning data "align_offset()" method on a pointer type (our pointer tracker), so you need just to add requested-data size
+- the only challenge you'll face is offsetting the tracker pointer for the next allocation,you need first to align current pointer for the requested-data alignment, then add to the tracker requasted-data size, lukcy for us rust does have a method for aligning data "align_offset()" method on a pointer type (our pointer tracker), so you need just to add requested-data size
 > [!NOTE]
-> if you want to align the data without rust's method, you only need the modular of current used bytes by data alignment, then use it to substract data alignment with it
+> if you want to align the data without rust's method, you only need the modular of current used bytes by data alignment, then use it to subtract data alignment with it
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
 
 ## Stack allocator
 - It's just like the leaner allocator, the only difference is poll allocator stores metadata of every tracker that comes from pushing data to the arena, and uses-bytes between each offset in order to pop the last allocated data
 > [!NOTE]
-> you might ask why we can don't impl removing from different location rather the the alst one , I would answer by there's another allocator that does what you ask but with tiny minor changes [the pool allocator](#Pool-allocator)
-### implimentation
+> you might ask why we can don't impl removing from different location rather the the last one , I would answer by there's another allocator that does what you ask but with tiny minor changes [the pool allocator](#Pool-allocator)
+### implementation
 - `build` method: build the arena with a specific layout, with initializing previous tracker beside previous size allocation metadata of the stack allocator struct
-- `push` method: push data to the arena, returning a pointer to the start of it, storing tracker before the offseting and size of allocation (including padding)
+- `push` method: push data to the arena, returning a pointer to the start of it, storing tracker before the offsetting and size of allocation (including padding)
 - `pop` method: pop the last allocation from the arena using prev tracker and prev size allocation
 - `clear` method: to deallocate the arena
 ### what you gonna need ?
 - same step as the bump allocator
-- the only addition thing is to store prev tracker and prev allocation size in order to optionnaly pop it later
+- the only addition thing is to store prev tracker and prev allocation size in order to optionally pop it later
 ### Resources
 https://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-003/
 ## Pool allocator
-- this alloactor can allocate objects randomly with defined blocks that have the same layout (with size = alignment) inside the arena, it will additionnaly stores layout,tracker and bool if it free to use as a Block strcut as metadata to pool allocator. The pool allocator only have trailling padding, cuz when building the allocator, i already build the blocks(allocate), i just need to change what inside those blocks(data)
+- this allocator can allocate objects randomly with defined blocks that have the same layout (with size = alignment) inside the arena, it will additionly stores layout,tracker and bool if it free to use as a Block strcut as metadata to pool allocator. The pool allocator only have trailing padding, cuz when building the allocator, i already build the blocks(allocate), i just need to change what inside those blocks(data)
 
-### implimentation
+### implementation
 - `build` method: build arena with specific layout and block size/alignment, constructing arena and tracker for each block
-- `push`  method: push data to arena by searching for available/free block, returing a pointer to that block
+- `push`  method: push data to arena by searching for available/free block, returning a pointer to that block
 - `remove` method: get a tracker to a available block. make that block free to use
 - `clear` method: deallocate the arena
 ### Resources
 https://www.gingerbill.org/article/2019/02/16/memory-allocation-strategies-004/
 # What i learned (notes on memory concepts, author's notes), this section answored some question i have on memory)
 
-- each block in memroy represent an address, we deal with addresses as bytes, and hexdecimal number
-- rust std returend `u8`(a byte in size) as a pointee type, make pointer manipulation easy to resaon about cuz your are doing them with pure bytes
+- each block in memory represent an address, we deal with addresses as bytes, and hexadecimal number
+- rust std returned `u8`(a byte in size) as a pointee type, make pointer manipulation easy to reason about cuz your are doing them with pure bytes
 
 - a `layout` is a description/request of a chunk of memory(no allocation yet), that request a size and an alignment
     - the required alignment is just an information, you'll impl the offset of the pointer manually to make an aligned data, the length is need for allocation
 
-- `memory alignment` describes where piece of data should store in memory, a data is properly aligned if its "starting address" is a "multiple" of its "required alignemnt", when this condition satisfied, we say "the data is "aligned" or "properley aligned""
-    - required alignment = is a num that describe where to allocate a data in memory in order to be valid, that valid address most be divisble by that number(required alignment)
+- `memory alignment` describes where piece of data should store in memory, a data is properly aligned if its "starting address" is a "multiple" of its "required alignment", when this condition satisfied, we say "the data is "aligned" or "properley aligned""
+    - required alignment = is a num that describe where to allocate a data in memory in order to be valid, that valid address most be divisible by that number(required alignment)
     - example usage: "data have alignment of 8 bytes(a valid address for this data are divible by 8)"
     - "align memory address" give it valid memory address based on the memory alignment
 - each type have different alignment (i thought why just make them all have alignment 1, so you can place any data in any address. But that will dencrease CPU efficiency as i know(search))
@@ -80,7 +80,7 @@ https://www.gingerbill.org/article/2019/02/16/memory-allocation-strategies-004/
 
 - `memory currpetion` means a pointer writes to or reads from memory it shouldn't (can be inside or outside the allocation), can lead to undefined behavior
 - `memory leak` means a memory was allocated but never release, if that happen regularly, will runs out of memory
-- `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignemnt
+- `fragmentation` means free memory (padding) is unusable inside the allocation that cuzed by bad layout alignment
 - `fragmentation fault` or `core dumb` is an error that occur when a program try to access memory from other program
 
 # What i learnt (notes on other then memory concepts, this section is heavliy for me)
