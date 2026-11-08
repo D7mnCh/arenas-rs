@@ -1,7 +1,10 @@
 use super::arenas::{arena::Arena, pool_allocator::Block};
-use std::alloc::Layout;
+use std::{
+    alloc::Layout,
+    ptr::{self, NonNull},
+};
 
-pub fn log_arena_build(layout: &Layout, start_ptr: *const u8) {
+pub fn log_arena_build(layout: &Layout, start_ptr: ptr::NonNull<u8>) {
     println!("[ARENA BUILD]");
 
     let arena_size = layout.size();
@@ -48,11 +51,11 @@ pub fn log_free_blocks(blocks: &[Block]) {
     println!();
 }
 
-pub fn log_push(alloc: &str, arena: &Arena, layout: &Layout) {
+pub fn log_push(alloc_name: &str, tracker: NonNull<u8>, layout: &Layout) {
     let requested_bytes = layout.size();
-    let padding = arena.tracker.align_offset(layout.align());
+    let padding = tracker.align_offset(layout.align());
 
-    println!("[{alloc} PUSH]");
+    println!("[{alloc_name} PUSH]");
 
     dbg!(requested_bytes, padding);
 
@@ -74,7 +77,7 @@ pub fn log_stack_pop(
     println!();
 }
 
-pub fn log_update_tracker(old: *const u8, new: *const u8) {
+pub fn log_update_tracker(old: NonNull<u8>, new: NonNull<u8>) {
     println!("tracker = {old:p} -> {new:p}",);
 }
 

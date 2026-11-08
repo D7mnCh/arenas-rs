@@ -2,6 +2,8 @@ use super::arena::Arena;
 use crate::log::{log_free_blocks, log_pool_alloc_build, log_pool_remove};
 use std::{alloc::Layout, ptr};
 
+// NOTE pool_allocator have it's own errors(warning?)
+
 #[derive(Debug)]
 pub struct PoolAlloc {
     pub arena: Arena,
@@ -27,7 +29,7 @@ impl Block {
 
 impl PoolAlloc {
     // add to arena_size if arena_size % block_size != 0, to get zero
-    //trailling padding, and arena_size be multiple of block_size
+    //trailing padding, and arena_size be multiple of block_size
     fn add_to_arena_size(arena_size: usize, block_size: usize) -> usize {
         let modulor = arena_size % block_size;
 
@@ -51,7 +53,7 @@ impl PoolAlloc {
         for indx in 0..num_blocks {
             let block_align = block_size;
             let layout = Layout::from_size_align(block_size, block_align).expect(
-                "requested length passed isize::MAX boundry \
+                "requested length passed isize::MAX boundary \
                  and wrapped to negative value",
             );
             let block_tracker: *mut u8;
