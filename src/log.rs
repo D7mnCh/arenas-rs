@@ -15,7 +15,14 @@ pub fn log_arena_build(layout: &Layout, start_ptr: ptr::NonNull<u8>) {
     println!();
 }
 
-pub fn log_pool_remove(tracker: *const u8) {
+pub fn log_adding_to_arena_to_match_num_blocks(bytes: usize) {
+    println!(
+        "[WARNING] adding {bytes} bytes to arena size to make it \
+         a multiple of the number of blocks"
+    );
+}
+
+pub fn log_pool_remove(tracker: NonNull<u8>) {
     println!("[POOL POP]");
     println!("freeing a block from this tracker : {tracker:p}");
 }
@@ -64,8 +71,8 @@ pub fn log_push(alloc_name: &str, tracker: NonNull<u8>, layout: &Layout) {
 }
 
 pub fn log_stack_pop(
-    old_tracker: *const u8,
-    new_tracker: *const u8,
+    old_tracker: NonNull<u8>,
+    new_tracker: NonNull<u8>,
     old_used_bytes: usize,
     current_used_bytes: usize,
 ) {

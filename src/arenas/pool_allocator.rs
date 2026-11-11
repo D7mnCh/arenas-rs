@@ -1,8 +1,37 @@
 use super::arena::Arena;
-use crate::log::{log_free_blocks, log_pool_alloc_build, log_pool_remove};
-use std::{alloc::Layout, ptr};
+use crate::{
+    arenas::arena::ArenaError,
+    log::{
+        log_adding_to_arena_to_match_num_blocks, log_free_blocks, log_pool_alloc_build,
+        log_pool_remove,
+    },
+};
+use std::{alloc::Layout, ptr::NonNull};
 
-// NOTE pool_allocator have it's own errors(warning?)
+pub enum PoolAllocError {
+    OutOfBoundRequest,
+    PoolAllocFull,
+    InvalidTracker,
+    BlockAlreadyFree,
+}
+
+impl PoolAllocError {
+    fn report(&self) {
+        match self {
+            PoolAllocError::OutOfBoundRequest => {
+                println!("[WARNING] instance's size is bigger then block's size")
+            }
+            PoolAllocError::PoolAllocFull => println!("[WARNING] all blocks are reserved!"),
+            PoolAllocError::InvalidTracker => {
+                println!("[WARNING] tracker is not one of pool allocator's trackers\n")
+            }
+
+            PoolAllocError::BlockAlreadyFree => {
+                println!("[WARNING] block is unused (free) from the giving tracker\n")
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct PoolAlloc {
@@ -13,12 +42,12 @@ pub struct PoolAlloc {
 #[derive(Debug, PartialEq)]
 pub struct Block {
     pub layout: Layout,
-    pub tracker: *mut u8,
+    pub tracker: NonNull<u8>,
     pub is_used: bool,
 }
 
 impl Block {
-    pub fn build(layout: Layout, tracker: *mut u8) -> Self {
+    pub fn build(layout: Layout, tracker: NonNull<u8>) -> Self {
         Self {
             layout,
             tracker,
@@ -37,17 +66,14 @@ impl PoolAlloc {
             return 0;
         }
 
-        let add = block_size - modulor;
-        println!(
-            "[WARNING] adding {add} bytes to arena size to make it \
-             a multiple of the number of blocks"
-        );
-        return add;
+        let added_bytes = block_size - modulor;
+        log_adding_to_arena_to_match_num_blocks(added_bytes);
+        return added_bytes;
     }
 
-    fn construct_blocks(arena: &Arena, block_size: usize) -> Vec<Block> {
+    fn construct_blocks(arena: &Arena, block_size: usize) -> Result<Vec<Block>, ArenaError> {
         let mut blocks: Vec<Block> = Vec::new();
-        let first_block_tracker = arena.start.clone();
+        let first_block_tracker = arena.start.ok_or(ArenaError::ArenaBuildFailed)?;
         let num_blocks: usize = arena.layout.size() / block_size;
 
         for indx in 0..num_blocks {
@@ -56,7 +82,7 @@ impl PoolAlloc {
                 "requested length passed isize::MAX boundary \
                  and wrapped to negative value",
             );
-            let block_tracker: *mut u8;
+            let block_tracker: NonNull<u8>;
             let offset = indx * block_size;
             unsafe {
                 block_tracker = first_block_tracker.add(offset);
@@ -68,59 +94,60 @@ impl PoolAlloc {
 
         log_pool_alloc_build(num_blocks, &blocks);
 
-        return blocks;
+        return Ok(blocks);
     }
 
     // to build, need to specify blocks's layout and there trackers
-    pub fn build(mut arena_size: usize, block_size: usize) -> Self {
+    pub fn build(mut arena_size: usize, block_size: usize) -> Result<Self, ArenaError> {
         arena_size += PoolAlloc::add_to_arena_size(arena_size, block_size);
 
-        let arena = Arena::build(arena_size);
-        let blocks = PoolAlloc::construct_blocks(&arena, block_size);
+        let arena = Arena::build(arena_size)?;
+        let blocks = PoolAlloc::construct_blocks(&arena, block_size)?;
 
-        Self { arena, blocks }
+        Ok(Self { arena, blocks })
     }
 
-    pub fn push(&mut self, layout: &Layout) -> *mut u8 {
+    pub fn push(&mut self, layout: &Layout) -> Result<NonNull<u8>, PoolAllocError> {
         println!("[POOL PUSH]");
 
-        if layout.size() > self.blocks[0].layout.size() {
-            eprintln!("[WARNING] instance's size is bigger then block's size");
-            log_free_blocks(&self.blocks);
-            return ptr::null_mut();
-        }
-
-        // check for available block
+        // check for an available block
         let Some((indx, block)) = self
             .blocks
             .iter_mut()
             .enumerate()
-            .find(|(_indx, block)| !block.is_used)
+            .find(|(_, block)| !block.is_used)
         else {
-            eprintln!("[WARNING] all blocks are reserved!");
             log_free_blocks(&self.blocks);
-            return ptr::null_mut();
+            return Err(PoolAllocError::PoolAllocFull);
         };
-
         println!("[INFO] found tracker/free block");
+
+        // check if requested bytes fits inside block's size
+        if layout.size() > block.layout.size() {
+            log_free_blocks(&self.blocks);
+            return Err(PoolAllocError::OutOfBoundRequest);
+        }
+
         block.is_used = true;
         log_free_blocks(&self.blocks);
-        return self.blocks[indx].tracker;
+
+        return Ok(self.blocks[indx].tracker);
     }
 
-    pub fn remove(&mut self, tracker: *const u8) {
+    pub fn remove(&mut self, tracker: NonNull<u8>) -> Result<(), PoolAllocError> {
         let Some(index) = self.found_block(tracker) else {
-            eprintln!("[WARNING] tracker is not one of pool allocator's trackers\n");
-            return;
+            return Err(PoolAllocError::InvalidTracker);
         };
 
         let block = &mut self.blocks[index];
         if !block.is_used {
-            eprintln!("[WARNINIG] block is unused (free) from the givin tracker\n");
+            return Err(PoolAllocError::BlockAlreadyFree);
         }
 
         block.is_used = false;
         log_pool_remove(tracker);
+
+        Ok(())
     }
 
     pub fn clear(&mut self) {
@@ -129,9 +156,9 @@ impl PoolAlloc {
 
     // using "position" instead of "find" method, if i wanna return a block i need "&mut self"
     //but i am just searching for a valid block so just "&self"
-    fn found_block(&self, tracker: *const u8) -> Option<usize> {
+    fn found_block(&self, tracker: NonNull<u8>) -> Option<usize> {
         self.blocks
             .iter()
-            .position(|block| block.tracker.cast_const() == tracker)
+            .position(|block| block.tracker == tracker)
     }
 }

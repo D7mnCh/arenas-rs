@@ -1,7 +1,7 @@
 use super::arena::Arena;
 use crate::{
     arenas::arena::ArenaError,
-    log::{log_remaining_space, log_update_tracker, log_update_used_bytes},
+    log::{log_push, log_remaining_space, log_update_tracker, log_update_used_bytes},
 };
 use std::{alloc::Layout, ptr::NonNull};
 
@@ -17,14 +17,17 @@ impl BumpAlloc {
     }
 
     pub fn push(&mut self, layout: &Layout) -> Result<NonNull<u8>, ArenaError> {
-        let tracker = self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
+        let tracker = &self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
 
-        let bytes_to_push = self.arena.bytes_to_push(&layout)?;
-        let prev_tracker = tracker;
+        let padding = tracker.align_offset(layout.align());
+        let bytes_to_push = self.arena.bytes_to_push(&layout, padding);
+        let prev_tracker = *tracker;
 
-        self.arena.push(layout, bytes_to_push)?;
+        log_push("BUMP PUSH", *tracker, &layout);
 
-        log_update_tracker(prev_tracker, tracker);
+        self.arena.push(bytes_to_push)?;
+
+        log_update_tracker(prev_tracker, *tracker);
         log_update_used_bytes(bytes_to_push, self.arena.used_bytes);
         log_remaining_space(&self.arena);
 

@@ -1,4 +1,4 @@
-use crate::log::{log_arena_build, log_push, log_remaining_space};
+use crate::log::{log_arena_build, log_remaining_space};
 use std::{
     alloc::{Layout, LayoutError, alloc_zeroed, dealloc},
     ptr::NonNull,
@@ -10,6 +10,7 @@ pub enum ArenaError {
     ArenaBuildFailed,
     ArenaFull,
     TryUseOfUnbuiltArena,
+    ArenaEmpty,
 }
 
 // NOTE didn't really know why should the caller report and not me ?
@@ -26,6 +27,7 @@ impl ArenaError {
             ArenaError::UnexpectedLayoutArenaBuild(err) => {
                 println!("[WARNING] failed to build arena cuzed by unexpected Layout: {err} ")
             }
+            ArenaError::ArenaEmpty => println!("[WARNING] arena empty"),
         }
     }
 }
@@ -63,20 +65,15 @@ impl Arena {
         })
     }
 
-    pub fn bytes_to_push(&self, layout: &Layout) -> Result<usize, ArenaError> {
-        let tracker = self.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
-
+    pub fn bytes_to_push(&self, layout: &Layout, padding: usize) -> usize {
         let requested_bytes = layout.size();
-        let padding = tracker.align_offset(layout.align());
         let bytes = padding + requested_bytes;
 
-        Ok(bytes)
+        bytes
     }
 
-    pub fn push(&mut self, layout: &Layout, bytes_to_push: usize) -> Result<(), ArenaError> {
+    pub fn push(&mut self, bytes_to_push: usize) -> Result<(), ArenaError> {
         let tracker = self.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
-
-        log_push("BUMP", tracker, &layout);
 
         if self.layout.size() < self.used_bytes + bytes_to_push {
             log_remaining_space(&self);
