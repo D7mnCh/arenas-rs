@@ -4,10 +4,10 @@ use std::{
     ptr::NonNull,
 };
 
+#[derive(Debug, PartialEq)]
 pub enum ArenaError {
-    UnexpectedLayoutArenaBuild(LayoutError),
+    UnexpectedLayout(LayoutError),
     AllocationFailed,
-    ArenaBuildFailed,
     ArenaFull,
     TryUseOfUnbuiltArena,
     ArenaEmpty,
@@ -15,16 +15,15 @@ pub enum ArenaError {
 
 // NOTE didn't really know why should the caller report and not me ?
 impl ArenaError {
-    fn report(&self) {
+    pub fn report(&self) {
         match self {
             ArenaError::AllocationFailed => println!("[WARNING] arena allocation failed"),
             ArenaError::ArenaFull => println!(
                 "[WARNING] requested allocation \
                 is more then arena's remaining space\n",
             ),
-            ArenaError::ArenaBuildFailed => println!("[WARNING] arena build failed"),
             ArenaError::TryUseOfUnbuiltArena => println!("[WARNING] arena is unallocated to use"),
-            ArenaError::UnexpectedLayoutArenaBuild(err) => {
+            ArenaError::UnexpectedLayout(err) => {
                 println!("[WARNING] failed to build arena cuzed by unexpected Layout: {err} ")
             }
             ArenaError::ArenaEmpty => println!("[WARNING] arena empty"),
@@ -51,7 +50,7 @@ impl Arena {
         const ALIGNMENT: usize = 1;
 
         let layout = Layout::from_size_align(size, ALIGNMENT)
-            .map_err(|err| ArenaError::UnexpectedLayoutArenaBuild(err))?;
+            .map_err(|err| ArenaError::UnexpectedLayout(err))?;
         let start_ptr =
             NonNull::new(unsafe { alloc_zeroed(layout) }).ok_or(ArenaError::AllocationFailed)?;
 

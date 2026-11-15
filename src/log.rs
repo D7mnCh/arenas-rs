@@ -9,7 +9,7 @@ pub fn log_arena_build(layout: &Layout, start_ptr: ptr::NonNull<u8>) {
 
     let arena_size = layout.size();
     let arena_align = layout.align();
-    dbg!(arena_size, arena_align);
+    dbg!((arena_size, arena_align));
 
     println!("arena start = {:p}", start_ptr);
     println!();
@@ -64,7 +64,7 @@ pub fn log_push(alloc_name: &str, tracker: NonNull<u8>, layout: &Layout) {
 
     println!("[{alloc_name} PUSH]");
 
-    dbg!(requested_bytes, padding);
+    dbg!((requested_bytes, padding));
 
     let total = requested_bytes + padding;
     println!("total = {} b", total);

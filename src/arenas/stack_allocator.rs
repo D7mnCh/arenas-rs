@@ -24,20 +24,21 @@ impl StackAlloc {
     }
 
     pub fn push(&mut self, layout: &Layout) -> Result<NonNull<u8>, ArenaError> {
-        let tracker = &self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
+        let tracker = self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
 
         let padding = tracker.align_offset(layout.align());
         let bytes_to_push = self.arena.bytes_to_push(&layout, padding);
 
-        log_push("STACK PUSH", *tracker, &layout);
+        log_push("STACK PUSH", tracker, &layout);
 
-        let prev_tracker = *tracker;
+        let prev_tracker = tracker;
         self.arena.push(bytes_to_push)?;
+        let updated_tracker = self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
 
         // prev_trackers used on pop() to offset arena's tracker to where he was last time
         self.prev_trackers.push(prev_tracker);
 
-        log_update_tracker(prev_tracker, *tracker);
+        log_update_tracker(prev_tracker, updated_tracker);
         log_update_used_bytes(self.arena.used_bytes - bytes_to_push, self.arena.used_bytes);
         log_remaining_space(&self.arena);
 

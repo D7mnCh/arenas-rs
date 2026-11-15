@@ -8,6 +8,7 @@ use crate::{
 };
 use std::{alloc::Layout, ptr::NonNull};
 
+#[derive(Debug, PartialEq)]
 pub enum PoolAllocError {
     OutOfBoundRequest,
     PoolAllocFull,
@@ -73,15 +74,14 @@ impl PoolAlloc {
 
     fn construct_blocks(arena: &Arena, block_size: usize) -> Result<Vec<Block>, ArenaError> {
         let mut blocks: Vec<Block> = Vec::new();
-        let first_block_tracker = arena.start.ok_or(ArenaError::ArenaBuildFailed)?;
+        let first_block_tracker = arena.start.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
         let num_blocks: usize = arena.layout.size() / block_size;
+        let block_align = block_size;
+        dbg!((block_align, block_size));
 
         for indx in 0..num_blocks {
-            let block_align = block_size;
-            let layout = Layout::from_size_align(block_size, block_align).expect(
-                "requested length passed isize::MAX boundary \
-                 and wrapped to negative value",
-            );
+            let layout = Layout::from_size_align(block_size, block_align)
+                .map_err(|err| ArenaError::UnexpectedLayout(err))?;
             let block_tracker: NonNull<u8>;
             let offset = indx * block_size;
             unsafe {
@@ -135,11 +135,14 @@ impl PoolAlloc {
     }
 
     pub fn remove(&mut self, tracker: NonNull<u8>) -> Result<(), PoolAllocError> {
+        // check tracker validity
         let Some(index) = self.found_block(tracker) else {
             return Err(PoolAllocError::InvalidTracker);
         };
 
         let block = &mut self.blocks[index];
+
+        // check for if block already is free
         if !block.is_used {
             return Err(PoolAllocError::BlockAlreadyFree);
         }
@@ -152,6 +155,7 @@ impl PoolAlloc {
 
     pub fn clear(&mut self) {
         self.arena.clear();
+        self.blocks = Vec::new();
     }
 
     // using "position" instead of "find" method, if i wanna return a block i need "&mut self"

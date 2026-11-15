@@ -17,17 +17,19 @@ impl BumpAlloc {
     }
 
     pub fn push(&mut self, layout: &Layout) -> Result<NonNull<u8>, ArenaError> {
-        let tracker = &self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
+        // tracker use a copy of the Option cuz of ok_or() that takes self, and Option impl Copy
+        let tracker = self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
 
         let padding = tracker.align_offset(layout.align());
         let bytes_to_push = self.arena.bytes_to_push(&layout, padding);
-        let prev_tracker = *tracker;
+        let prev_tracker = tracker;
 
-        log_push("BUMP PUSH", *tracker, &layout);
+        log_push("BUMP", tracker, &layout);
 
         self.arena.push(bytes_to_push)?;
+        let updated_tracker = self.arena.tracker.ok_or(ArenaError::TryUseOfUnbuiltArena)?;
 
-        log_update_tracker(prev_tracker, *tracker);
+        log_update_tracker(prev_tracker, updated_tracker);
         log_update_used_bytes(bytes_to_push, self.arena.used_bytes);
         log_remaining_space(&self.arena);
 
