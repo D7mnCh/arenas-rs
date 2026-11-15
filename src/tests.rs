@@ -87,32 +87,32 @@ fn pool_allocator_remove() {
     assert!(pool_alloc.blocks[0].is_used == false);
 }
 
-// bumb/arena allocator tests
+// bump/arena allocator tests
 #[test]
-fn bumb_alloc_size() {
+fn bump_alloc_size() {
     const LENGTH: usize = 1000;
-    let bumb_alloc = BumpAlloc::build(LENGTH).unwrap();
+    let bump_alloc = BumpAlloc::build(LENGTH).unwrap();
 
-    assert_eq!(bumb_alloc.arena.layout.size(), LENGTH);
+    assert_eq!(bump_alloc.arena.layout.size(), LENGTH);
 }
 
 #[test]
-fn bumb_alloc_not_enough_space_to_allocate() {
-    let mut bumb_alloc = BumpAlloc::build(0).unwrap();
+fn bump_alloc_not_enough_space_to_allocate() {
+    let mut bump_alloc = BumpAlloc::build(0).unwrap();
     let layout = Layout::new::<i32>();
-    let ptr = bumb_alloc.push(&layout);
+    let ptr = bump_alloc.push(&layout);
     assert_eq!(ptr.unwrap_err(), ArenaError::ArenaFull);
-    assert_eq!(bumb_alloc.arena.used_bytes, 0);
+    assert_eq!(bump_alloc.arena.used_bytes, 0);
 }
 
 #[test]
 fn bump_alloc_pointer_update() {
-    let mut bumb_alloc = BumpAlloc::build(100).unwrap();
+    let mut bump_alloc = BumpAlloc::build(100).unwrap();
     let layout = Layout::new::<i32>();
-    let ptr_start = bumb_alloc.arena.tracker.unwrap();
-    let _ = bumb_alloc.push(&layout).unwrap();
-    let ptr_update_1 = bumb_alloc.push(&layout).unwrap();
-    let ptr_update_2 = bumb_alloc.push(&layout).unwrap();
+    let ptr_start = bump_alloc.arena.tracker.unwrap();
+    let _ = bump_alloc.push(&layout).unwrap();
+    let ptr_update_1 = bump_alloc.push(&layout).unwrap();
+    let ptr_update_2 = bump_alloc.push(&layout).unwrap();
     unsafe {
         assert_eq!(ptr_start.add(size_of::<i32>()), ptr_update_1);
         assert_eq!(ptr_start.add(size_of::<[i32; 2]>()), ptr_update_2);
@@ -120,24 +120,24 @@ fn bump_alloc_pointer_update() {
 }
 
 #[test]
-fn bumb_alloc_push_primitives() {
+fn bump_alloc_push_primitives() {
     const LENGTH: usize = 1000;
-    let mut bumb_alloc = BumpAlloc::build(LENGTH).unwrap();
+    let mut bump_alloc = BumpAlloc::build(LENGTH).unwrap();
 
     let layout = Layout::new::<[i16; 2]>();
-    let ptr_1 = bumb_alloc.push(&layout).unwrap().cast::<[i16; 2]>();
-    assert_eq!(bumb_alloc.arena.used_bytes, 4);
+    let ptr_1 = bump_alloc.push(&layout).unwrap().cast::<[i16; 2]>();
+    assert_eq!(bump_alloc.arena.used_bytes, 4);
 
     let layout = Layout::new::<[i64; 3]>();
-    let ptr_2 = bumb_alloc.push(&layout).unwrap().cast::<[i64; 3]>();
+    let ptr_2 = bump_alloc.push(&layout).unwrap().cast::<[i64; 3]>();
     let padding = 4;
     let prev_area_used_bytes = 4;
     assert_eq!(
-        bumb_alloc.arena.used_bytes,
+        bump_alloc.arena.used_bytes,
         prev_area_used_bytes + layout.size() + padding
     );
 
-    // testing bumb_alloc.arena.tracker
+    // testing bump_alloc.arena.tracker
     unsafe {
         ptr_1.write([1, 2]);
         ptr_2.write([3, 4, 5]);
@@ -145,11 +145,11 @@ fn bumb_alloc_push_primitives() {
         assert_eq!(ptr_2.read(), [3, 4, 5]);
     }
 
-    bumb_alloc.clear();
+    bump_alloc.clear();
 }
 
 #[test]
-fn bumb_alloc_push_struct() {
+fn bump_alloc_push_struct() {
     const LENGTH: usize = 1000;
 
     #[derive(Debug)]
@@ -165,15 +165,15 @@ fn bumb_alloc_push_struct() {
 
     let foo_layout = Layout::new::<Foo>();
     let boo_layout = Layout::new::<Boo>();
-    let mut bumb_alloc = BumpAlloc::build(LENGTH).unwrap();
+    let mut bump_alloc = BumpAlloc::build(LENGTH).unwrap();
 
-    let ptr_1 = bumb_alloc.push(&foo_layout).unwrap().cast::<Foo>();
-    assert_eq!(bumb_alloc.arena.used_bytes, foo_layout.size());
+    let ptr_1 = bump_alloc.push(&foo_layout).unwrap().cast::<Foo>();
+    assert_eq!(bump_alloc.arena.used_bytes, foo_layout.size());
 
-    let ptr_2 = bumb_alloc.push(&boo_layout).unwrap().cast::<Boo>();
+    let ptr_2 = bump_alloc.push(&boo_layout).unwrap().cast::<Boo>();
     let prev_area_used_bytes = 16;
     assert_eq!(
-        bumb_alloc.arena.used_bytes,
+        bump_alloc.arena.used_bytes,
         prev_area_used_bytes + boo_layout.size()
     );
 
@@ -193,17 +193,17 @@ fn bumb_alloc_push_struct() {
         dbg!(ptr_2);
         dbg!(ptr_2.read());
     }
-    bumb_alloc.clear();
+    bump_alloc.clear();
 }
 
 #[test]
 fn use_tracker_start_on_empty_arena() {
     const LENGTH: usize = 1000;
-    let mut bumb_alloc = BumpAlloc::build(LENGTH).unwrap();
+    let mut bump_alloc = BumpAlloc::build(LENGTH).unwrap();
 
-    bumb_alloc.clear();
+    bump_alloc.clear();
 
-    assert!(bumb_alloc.arena.start.is_none());
+    assert!(bump_alloc.arena.start.is_none());
 }
 
 //Stack allocator tests
